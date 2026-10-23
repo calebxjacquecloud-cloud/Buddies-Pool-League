@@ -146,6 +146,7 @@ TV mode shows a **QR code**; players scan it with their phone camera, tap their 
 
 | Problem | Fix |
 |---|---|
+| "Setup problem" screen | It names the setting that's wrong. Fix it in Netlify → Site configuration → Environment variables, then **Deploys → Trigger deploy → Deploy site**. The Project URL must look exactly like `https://xxxx.supabase.co`. |
 | Blue "Demo mode" banner on the live site | `VITE_SUPABASE_URL` / `VITE_SUPABASE_ANON_KEY` are missing or misspelled in Netlify. Fix them, then **Trigger deploy**. |
 | "Wrong PIN" though it's right | Check `HOST_PIN` in Netlify (no spaces), then redeploy. |
 | "Server is missing SUPABASE_URL…" | Add `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` in Netlify and redeploy. |
