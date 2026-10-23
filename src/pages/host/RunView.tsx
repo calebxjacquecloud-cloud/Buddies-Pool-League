@@ -44,6 +44,7 @@ export function RunView({ t, host, refresh }: { t: LiveTournament; host: HostDat
     await refresh();
     toast({
       tone: 'ok',
+      group: 'result',
       text: `${name(winner)} wins ${matchLabel(matchId)}`,
       action: { label: 'Undo', run: () => void undo(expectedEvents + 1, { type: 'result', matchId, winner }) },
     });
@@ -59,7 +60,7 @@ export function RunView({ t, host, refresh }: { t: LiveTournament; host: HostDat
     }
     if ((await run('undo', { tournamentId: tour.id, expectedEvents: expected }, { onStale })) !== undefined) {
       await refresh();
-      toast({ tone: 'info', text: `Undone: ${describeEvent(last, name)}` });
+      toast({ tone: 'info', group: 'result', text: `Undone: ${describeEvent(last, name)}` });
     }
   };
 

@@ -10,7 +10,8 @@ interface Props {
   highlight?: string | null;
 }
 
-const SLOT_H = { host: 88, public: 80, tv: 96 } as const;
+// Row height per match; must exceed the box height (header + two player rows).
+const SLOT_H = { host: 96, public: 92, tv: 112 } as const;
 const BOX_W = { host: 'w-52', public: 'w-44', tv: 'w-60' } as const;
 
 /** Full double-elimination bracket: winners on top (with the grand final), losers below. */

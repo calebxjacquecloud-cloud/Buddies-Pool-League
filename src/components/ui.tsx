@@ -64,7 +64,8 @@ export function DemoBanner() {
 
 // ------------------------------------------------------------------ Toasts
 
-type Toast = { id: number; text: string; tone: 'ok' | 'error' | 'info'; action?: { label: string; run: () => void } };
+/** Toasts with the same `group` replace each other (e.g. only the latest result keeps its Undo button). */
+type Toast = { id: number; text: string; tone: 'ok' | 'error' | 'info'; group?: string; action?: { label: string; run: () => void } };
 const ToastCtx = createContext<(t: Omit<Toast, 'id'>) => void>(() => {});
 
 export function ToastProvider({ children }: { children: ReactNode }) {
@@ -72,7 +73,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const nextId = useRef(1);
   const push = useCallback((t: Omit<Toast, 'id'>) => {
     const id = nextId.current++;
-    setToasts((ts) => [...ts.slice(-2), { ...t, id }]);
+    setToasts((ts) => [...ts.filter((x) => !t.group || x.group !== t.group).slice(-2), { ...t, id }]);
     setTimeout(() => setToasts((ts) => ts.filter((x) => x.id !== id)), t.tone === 'error' ? 7000 : 4500);
   }, []);
   return (
