@@ -6,6 +6,6 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: { host: true },
   test: {
-    include: ['src/**/*.test.ts', 'netlify/**/*.test.ts'],
+    include: ['src/**/*.test.ts', 'netlify/**/*.test.ts', 'supabase/**/*.test.ts'],
   },
 } as any);

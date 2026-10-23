@@ -13,5 +13,5 @@
     "noEmit": true,
     "types": ["node"]
   },
-  "include": ["vite.config.ts", "netlify", "scripts"]
+  "include": ["vite.config.ts", "netlify", "scripts", "supabase"]
 }

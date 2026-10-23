@@ -6,3 +6,4 @@ dist
 .netlify
 *.log
 .DS_Store
+.scratch
