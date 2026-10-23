@@ -13,6 +13,9 @@ describe('readSupabaseConfig', () => {
   it('tidies copy-paste slips', () => {
     expect(readSupabaseConfig(' "https://abcd.supabase.co/rest/v1/" ', ` '${KEY}' `).config).toEqual({ url: 'https://abcd.supabase.co', key: KEY });
   });
+  it('accepts a bare project ID', () => {
+    expect(readSupabaseConfig('agxpviwscnmjvuovncpw', KEY).config?.url).toBe('https://agxpviwscnmjvuovncpw.supabase.co');
+  });
   it('explains common mistakes', () => {
     expect(readSupabaseConfig('abcd.supabase.co', KEY).problem).toMatch(/not a web address/);
     expect(readSupabaseConfig('http://abcd.supabase.co', KEY).problem).toMatch(/https/);

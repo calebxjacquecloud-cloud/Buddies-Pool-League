@@ -11,7 +11,9 @@ export interface SupabaseConfig {
 const clean = (v: string | undefined) => (v ?? '').trim().replace(/^["']+|["']+$/g, '').trim();
 
 export function readSupabaseConfig(rawUrl: string | undefined, rawKey: string | undefined): { config: SupabaseConfig | null; problem: string | null } {
-  const url = clean(rawUrl).replace(/\/+$/, '').replace(/\/rest\/v1$/, '').replace(/\/+$/, '');
+  let url = clean(rawUrl).replace(/\/+$/, '').replace(/\/rest\/v1$/, '').replace(/\/+$/, '');
+  // A bare project ID (e.g. "abcdefghijklmnopqrst") means https://<id>.supabase.co.
+  if (/^[a-z0-9]{20}$/.test(url)) url = `https://${url}.supabase.co`;
   const key = clean(rawKey);
   if (!url && !key) return { config: null, problem: null }; // demo mode
   if (!url) return { config: null, problem: 'VITE_SUPABASE_URL is missing. Add your Supabase Project URL (https://xxxx.supabase.co).' };
