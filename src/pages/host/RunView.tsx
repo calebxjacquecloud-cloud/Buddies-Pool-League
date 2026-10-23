@@ -8,6 +8,7 @@ import { enterFullscreen } from '../../components/fullscreen';
 import type { LiveTournament } from '../../hooks/data';
 import { useIsIOS } from '../../hooks/data';
 import { useHostAction } from '../../hooks/host';
+import { useWakeLock } from '../../hooks/wakeLock';
 import { smsHref, startMessage } from '../../shared/messages';
 import type { TournamentSettings } from '../../shared/model';
 import { formatPhone } from '../../shared/phone';
@@ -33,6 +34,7 @@ export function RunView({ t, host, refresh }: { t: LiveTournament; host: HostDat
   const toast = useToast();
   const confirm = useConfirm();
   const navigate = useNavigate();
+  useWakeLock();
 
   if (!state) return null;
   const expectedEvents = events.length;
@@ -288,7 +290,7 @@ function MatchModal({
     if (res !== undefined) {
       await refresh();
       onClose();
-      toast({ tone: 'ok', text: `${matchLabel(m.id)} corrected` });
+      toast({ tone: 'ok', group: 'result', text: `${matchLabel(m.id)} corrected` });
     }
   };
 
@@ -347,7 +349,7 @@ function PlayersTab({ t, host, refresh }: { t: LiveTournament; host: HostData; r
     if (!ok) return;
     if ((await run('withdraw', { tournamentId: tour.id, playerId: pid, expectedEvents: bundle.events.length }, { onStale: () => void refresh() })) !== undefined) {
       await refresh();
-      toast({ tone: 'info', text: `${name(pid)} withdrew` });
+      toast({ tone: 'info', group: 'result', text: `${name(pid)} withdrew` });
     }
   };
 
@@ -376,7 +378,7 @@ function PlayersTab({ t, host, refresh }: { t: LiveTournament; host: HostData; r
               const res = await run('addEntrant', { tournamentId: tour.id, playerId, expectedEvents: bundle.events.length }, { onStale: () => void refresh() });
               if (res !== undefined) {
                 await refresh();
-                toast({ tone: 'ok', text: 'Added to the bracket' });
+                toast({ tone: 'ok', group: 'result', text: 'Added to the bracket' });
               }
             }}
           />

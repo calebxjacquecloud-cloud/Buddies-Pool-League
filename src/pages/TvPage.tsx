@@ -108,7 +108,7 @@ export function TvPage() {
       )}
 
       {chrome && (
-        <div className="fixed top-3 right-3 flex gap-2 animate-pop">
+        <div className="fixed bottom-3 left-3 flex gap-2 animate-pop">
           {!fs && fullscreenSupported() && (
             <button className="btn-secondary btn-sm" onClick={() => enterFullscreen()}>
               ⛶ Full screen
@@ -133,9 +133,9 @@ export function TvPage() {
 
 function QrPanel({ url, label }: { url: string; label: string }) {
   return (
-    <div className="mt-auto flex items-center gap-4 rounded-2xl bg-surface-2 border border-line p-4">
+    <div className="mt-auto flex flex-wrap items-center justify-center gap-4 rounded-2xl bg-surface-2 border border-line p-4 text-center">
       <QR url={url} className="w-36 h-36 shrink-0" />
-      <div className="text-xl font-bold leading-snug">
+      <div className="text-xl font-bold leading-snug min-w-40 flex-1">
         📱 Scan me
         <div className="text-base text-muted font-semibold mt-1">{label}</div>
       </div>

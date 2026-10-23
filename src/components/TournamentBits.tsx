@@ -53,7 +53,7 @@ export function QueueList({ state, name, tv, limit = 6 }: { state: BracketState;
             <div className={`font-bold uppercase tracking-wider ${tv ? 'text-base' : 'text-xs'} ${kind === 'table' ? 'text-felt' : 'text-sky'}`}>
               {kind === 'table' ? `Table ${m.table} · now` : i === state.onTable.length ? 'Up next' : `Then`} · {roundLabel(m.def, state.structure)} · {matchLabel(id)}
             </div>
-            <div className="font-black truncate">
+            <div className={`font-black ${tv ? 'break-words leading-tight' : 'truncate'}`}>
               {name(m.players[0])} <span className="text-faint font-semibold">vs</span> {name(m.players[1])}
             </div>
           </li>

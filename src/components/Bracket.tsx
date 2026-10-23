@@ -133,7 +133,10 @@ function MatchBox({
           me ? 'bg-gold/15' : ''
         }`}
       >
-        <span className="truncate">{p === BYE ? <span className="text-faint not-italic text-xs">BYE</span> : label}</span>
+        <span className="truncate">
+          {p === BYE ? <span className="text-faint not-italic text-xs">BYE</span> : label}
+          {p && p !== BYE && state.players[p]?.withdrawn && <span className="ml-1 text-xs font-semibold text-danger no-underline">(withdrew)</span>}
+        </span>
         {won && <span className="text-felt text-sm">✓</span>}
       </div>
     );

@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
+import { useLocation } from 'react-router-dom';
 import { useConnection } from '../hooks/data';
 import { isDemo } from '../data';
 
@@ -71,6 +72,8 @@ const ToastCtx = createContext<(t: Omit<Toast, 'id'>) => void>(() => {});
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [toasts, setToasts] = useState<Toast[]>([]);
   const nextId = useRef(1);
+  // Never show host messages on the TV screen.
+  const onTv = useLocation().pathname.startsWith('/tv/');
   const push = useCallback((t: Omit<Toast, 'id'>) => {
     const id = nextId.current++;
     setToasts((ts) => [...ts.filter((x) => !t.group || x.group !== t.group).slice(-2), { ...t, id }]);
@@ -80,7 +83,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
     <ToastCtx.Provider value={push}>
       {children}
       <div className="fixed inset-x-0 bottom-0 z-50 flex flex-col items-center gap-2 p-4 safe-b pointer-events-none">
-        {toasts.map((t) => (
+        {!onTv && toasts.map((t) => (
           <div
             key={t.id}
             role={t.tone === 'error' ? 'alert' : 'status'}
