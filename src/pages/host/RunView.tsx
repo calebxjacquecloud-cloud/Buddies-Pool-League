@@ -6,18 +6,15 @@ import { ChampionCard, StatusChip } from '../../components/TournamentBits';
 import { Modal, Stepper, Toggle, useConfirm, useToast } from '../../components/ui';
 import { enterFullscreen } from '../../components/fullscreen';
 import type { LiveTournament } from '../../hooks/data';
-import { useIsIOS } from '../../hooks/data';
 import { useHostAction } from '../../hooks/host';
 import { useWakeLock } from '../../hooks/wakeLock';
-import { smsHref, startMessage } from '../../shared/messages';
 import type { TournamentSettings } from '../../shared/model';
-import { formatPhone } from '../../shared/phone';
 import { formatDate } from '../../shared/util';
 import type { useHostData } from './HostTournament';
 import { PlayerPicker } from './PlayerPicker';
 
 type HostData = ReturnType<typeof useHostData>;
-type Tab = 'matches' | 'bracket' | 'players' | 'texts';
+type Tab = 'matches' | 'bracket' | 'players';
 
 export function describeEvent(e: EngineEvent, name: (id: string) => string) {
   return e.type === 'result' ? `${name(e.winner)} won ${matchLabel(e.matchId)}` : `${name(e.player)} withdrew`;
@@ -75,7 +72,6 @@ export function RunView({ t, host, refresh }: { t: LiveTournament; host: HostDat
     { id: 'matches', label: 'Matches' },
     { id: 'bracket', label: 'Bracket' },
     { id: 'players', label: 'Players' },
-    { id: 'texts', label: 'Texts' },
   ];
 
   return (
@@ -125,7 +121,6 @@ export function RunView({ t, host, refresh }: { t: LiveTournament; host: HostDat
         </div>
       )}
       {tab === 'players' && <PlayersTab t={t} host={host} refresh={refresh} />}
-      {tab === 'texts' && <TextsTab t={t} host={host} />}
 
       <MatchModal
         matchId={matchOpen}
@@ -329,7 +324,6 @@ function PlayersTab({ t, host, refresh }: { t: LiveTournament; host: HostData; r
   const { run, busy } = useHostAction();
   const confirm = useConfirm();
   const toast = useToast();
-  const isIOS = useIsIOS();
   const entered = useMemo(() => new Set(bundle.entrants.map((e) => e.player_id)), [bundle.entrants]);
   if (!state) return null;
   const rows = [...bundle.entrants].sort((a, b) => {
@@ -350,15 +344,6 @@ function PlayersTab({ t, host, refresh }: { t: LiveTournament; host: HostData; r
     if ((await run('withdraw', { tournamentId: tour.id, playerId: pid, expectedEvents: bundle.events.length }, { onStale: () => void refresh() })) !== undefined) {
       await refresh();
       toast({ tone: 'info', group: 'result', text: `${name(pid)} withdrew` });
-    }
-  };
-
-  const copy = async (text: string) => {
-    try {
-      await navigator.clipboard.writeText(text);
-      toast({ tone: 'ok', text: 'Link copied' });
-    } catch {
-      toast({ tone: 'error', text: 'Could not copy. Long-press the link instead.' });
     }
   };
 
@@ -387,9 +372,6 @@ function PlayersTab({ t, host, refresh }: { t: LiveTournament; host: HostData; r
       <section className="card divide-y divide-line">
         {rows.map((e) => {
           const ps = state.players[e.player_id];
-          const link = host.extras?.links[e.player_id];
-          const phone = host.extras?.phones[e.player_id];
-          const body = link ? startMessage(link) : '';
           return (
             <div key={e.player_id} className="p-4 flex flex-wrap items-center gap-3">
               <div className="flex-1 min-w-48">
@@ -399,94 +381,16 @@ function PlayersTab({ t, host, refresh }: { t: LiveTournament; host: HostData; r
                   <span>
                     {ps.wins}-{ps.playedLosses} tonight
                   </span>
-                  {phone?.phone && <span>{phone.opted_out ? '📵 opted out' : `📱 ${formatPhone(phone.phone)}`}</span>}
                 </div>
               </div>
-              {link && (
-                <>
-                  <a className="btn-secondary btn-sm" href={smsHref(phone?.phone ?? null, body, isIOS)}>
-                    💬 Share via Messages
-                  </a>
-                  <button className="btn-ghost btn-sm" onClick={() => copy(link)}>
-                    Copy link
-                  </button>
-                  <Link className="btn-ghost btn-sm" to={`/t/${tour.id}/p/${e.player_id}`}>
-                    View
-                  </Link>
-                </>
-              )}
+              <Link className="btn-ghost btn-sm" to={`/t/${tour.id}/p/${e.player_id}`}>
+                View
+              </Link>
               {!state.complete && !ps.withdrawn && ps.status !== 'eliminated' && (
                 <button className="btn-ghost btn-sm text-danger" onClick={() => withdraw(e.player_id)} disabled={busy}>
                   Withdraw
                 </button>
               )}
-            </div>
-          );
-        })}
-      </section>
-    </div>
-  );
-}
-
-// --------------------------------------------------------------- Texts tab
-
-function TextsTab({ t, host }: { t: LiveTournament; host: HostData }) {
-  const { name, bundle } = t;
-  const { run, busy } = useHostAction();
-  const toast = useToast();
-  const extras = host.extras;
-  if (!extras) return null;
-  const startLog = new Map(extras.sms.filter((s) => s.kind === 'start').map((s) => [s.player_id, s]));
-  const upNextCount = extras.sms.filter((s) => s.kind === 'up_next' && s.status === 'sent').length;
-
-  return (
-    <div className="space-y-5">
-      {!extras.smsConfigured ? (
-        <div className="card p-5 border-gold/50">
-          <h2 className="text-lg font-black text-gold">Texting isn't set up yet</h2>
-          <p className="text-muted mt-1">
-            Until Twilio is approved, use <b>Share via Messages</b> on the Players tab (opens this iPad's Messages app with the text ready), or put the TV up: it shows a
-            QR code players can scan to find their name.
-          </p>
-        </div>
-      ) : (
-        <div className="card p-5 flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-black">Start texts</h2>
-            <p className="text-muted text-sm">Sends to anyone with a number who hasn't been texted yet (skips opt-outs). {upNextCount > 0 && `${upNextCount} “up next” texts sent.`}</p>
-          </div>
-          <button
-            className="btn-primary"
-            disabled={busy}
-            onClick={async () => {
-              const res = await run<{ sent: number; failed: number }>('sendStartTexts', { tournamentId: bundle.tournament.id });
-              if (res) {
-                toast({ tone: res.failed ? 'error' : 'ok', text: `Sent ${res.sent}${res.failed ? `, ${res.failed} failed` : ''}` });
-                void host.reloadExtras();
-              }
-            }}
-          >
-            Send / retry texts
-          </button>
-        </div>
-      )}
-      <section className="card divide-y divide-line">
-        {bundle.entrants.map((e) => {
-          const log = startLog.get(e.player_id);
-          const phone = extras.phones[e.player_id];
-          const status = !phone?.phone
-            ? { text: 'No phone', tone: 'text-faint' }
-            : phone.opted_out
-              ? { text: 'Opted out (STOP)', tone: 'text-danger' }
-              : log?.status === 'sent'
-                ? { text: 'Sent ✓', tone: 'text-felt' }
-                : log?.status === 'failed'
-                  ? { text: `Failed: ${log.error ?? ''}`, tone: 'text-danger' }
-                  : { text: 'Not sent', tone: 'text-muted' };
-          return (
-            <div key={e.player_id} className="p-4 flex items-center justify-between gap-3">
-              <span className="font-semibold">{name(e.player_id)}</span>
-              <span className={`text-sm font-semibold ${status.tone}`}>{status.text}</span>
             </div>
           );
         })}
@@ -529,7 +433,6 @@ function SettingsModal({ open, onClose, t, refresh }: { open: boolean; onClose: 
           checked={tour.settings.grandFinalReset}
           onChange={(v) => !gf1Done && set({ grandFinalReset: v })}
         />
-        <Toggle label="“You’re up next” texts" hint="Requires Twilio" checked={tour.settings.upNextTexts} onChange={(v) => set({ upNextTexts: v })} />
         <div className="pt-4 border-t border-line">
           <button
             className="btn-ghost text-danger w-full"

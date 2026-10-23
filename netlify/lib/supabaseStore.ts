@@ -1,15 +1,6 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import type { EngineEvent } from '../../src/engine';
-import type {
-  Entrant,
-  EntrantToken,
-  MatchRow,
-  Player,
-  PlayerPrivate,
-  Season,
-  SmsLog,
-  Tournament,
-} from '../../src/shared/model';
+import type { Entrant, MatchRow, Player, Season, Tournament } from '../../src/shared/model';
 import type { Store } from '../../src/shared/store';
 import { AppError } from '../../src/shared/util';
 
@@ -49,21 +40,6 @@ export class SupabaseStore implements Store {
     const res = await this.db.from('players').update(patch).eq('id', id);
     if (res.error?.code === '23505') throw new AppError('That name is already taken', 409, 'DUPLICATE');
     this.check(res);
-  }
-
-  async listPrivate(ids?: string[]) {
-    let q = this.db.from('player_private').select('*');
-    if (ids) q = q.in('player_id', ids);
-    return this.check(await q) as PlayerPrivate[];
-  }
-  async upsertPrivate(p: PlayerPrivate) {
-    this.check(await this.db.from('player_private').upsert(p));
-  }
-  async setOptOutByPhone(phone: string, optedOut: boolean) {
-    const rows = this.check(
-      await this.db.from('player_private').update({ opted_out: optedOut, updated_at: new Date().toISOString() }).eq('phone', phone).select('player_id'),
-    );
-    return rows?.length ?? 0;
   }
 
   async listTournaments() {
@@ -118,40 +94,6 @@ export class SupabaseStore implements Store {
   }
   async replaceMatches(tid: string, rows: MatchRow[]) {
     this.check(await this.db.rpc('replace_matches', { p_tournament: tid, p_rows: rows }));
-  }
-
-  async listTokens(tid: string) {
-    return this.check(await this.db.from('entrant_tokens').select('*').eq('tournament_id', tid)) as EntrantToken[];
-  }
-  async getToken(token: string) {
-    return this.check(await this.db.from('entrant_tokens').select('*').eq('token', token).maybeSingle()) as EntrantToken | null;
-  }
-  async insertTokens(rows: EntrantToken[]) {
-    if (rows.length) this.check(await this.db.from('entrant_tokens').insert(rows));
-  }
-
-  async listSms(tid: string) {
-    return this.check(await this.db.from('sms_log').select('*').eq('tournament_id', tid).order('created_at')) as SmsLog[];
-  }
-  async claimSms(row: SmsLog) {
-    const { created_at: _ignored, ...rest } = row;
-    void _ignored;
-    const ins = await this.db.from('sms_log').insert(rest);
-    if (!ins.error) return true;
-    if (ins.error.code !== '23505') this.check(ins);
-    // Row exists: take it over only if the earlier attempt failed.
-    const upd = this.check(
-      await this.db
-        .from('sms_log')
-        .update({ status: 'skipped', error: 'sending', phone: row.phone })
-        .match({ tournament_id: row.tournament_id, player_id: row.player_id, kind: row.kind, match_id: row.match_id, status: 'failed' })
-        .select('id'),
-    );
-    return (upd?.length ?? 0) > 0;
-  }
-  async updateSms(row: Pick<SmsLog, 'tournament_id' | 'player_id' | 'kind' | 'match_id'> & Partial<SmsLog>) {
-    const { tournament_id, player_id, kind, match_id, ...patch } = row;
-    this.check(await this.db.from('sms_log').update(patch).match({ tournament_id, player_id, kind, match_id }));
   }
 
   async listSeasons() {

@@ -59,7 +59,7 @@ export function HostHome() {
       <section className="grid gap-4 md:grid-cols-3">
         <Link to="/host/players" className="card p-5 active:scale-[0.99] transition">
           <div className="text-lg font-black">👥 Players</div>
-          <div className="text-muted text-sm">Edit names and phone numbers</div>
+          <div className="text-muted text-sm">Fix names, see everyone's stats</div>
         </Link>
         <SeasonsCard />
         <div className="card p-5 flex flex-col gap-3">

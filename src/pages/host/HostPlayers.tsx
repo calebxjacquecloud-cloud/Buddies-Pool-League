@@ -2,17 +2,16 @@ import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Spinner } from '../../components/ui';
 import { backend } from '../../data';
-import type { HostPlayer } from '../../shared/model';
+import type { Player } from '../../shared/model';
 import { searchPlayers } from '../../shared/names';
-import { formatPhone } from '../../shared/phone';
 import { PlayerEditModal } from './PlayerPicker';
 
-/** Roster management: names, private phone numbers, opt-out status. */
+/** Roster management: fix player names, see their stats. */
 export function HostPlayers() {
-  const [players, setPlayers] = useState<HostPlayer[] | null>(null);
+  const [players, setPlayers] = useState<Player[] | null>(null);
   const [query, setQuery] = useState('');
-  const [editing, setEditing] = useState<HostPlayer | null>(null);
-  const load = async () => setPlayers(await backend.host<HostPlayer[]>('hostPlayers').catch(() => players ?? []));
+  const [editing, setEditing] = useState<Player | null>(null);
+  const load = async () => setPlayers(await backend.host<Player[]>('hostPlayers').catch(() => players ?? []));
   useEffect(() => {
     void load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -28,7 +27,7 @@ export function HostPlayers() {
         <h1 className="text-3xl font-black">Players ({players?.length ?? 0})</h1>
         <input className="field max-w-sm" placeholder="Search" value={query} onChange={(e) => setQuery(e.target.value)} />
       </div>
-      <p className="text-sm text-muted">Phone numbers are private: only hosts see them, and they're never shown on the TV or public pages. Add new players from a tournament's registration screen.</p>
+      <p className="text-sm text-muted">Add new players from a tournament's registration screen. Tap a name to see their stats.</p>
       {!players ? (
         <Spinner />
       ) : (
@@ -39,10 +38,6 @@ export function HostPlayers() {
                 <Link to={`/players/${p.id}`} className="text-lg font-bold">
                   {p.display_name}
                 </Link>
-                <div className="text-sm text-muted">
-                  {p.phone ? formatPhone(p.phone) : 'No phone'}
-                  {p.opted_out && <span className="ml-2 chip bg-danger/20 text-danger">Opted out</span>}
-                </div>
               </div>
               <button className="btn-secondary btn-sm" onClick={() => setEditing(p)}>
                 Edit

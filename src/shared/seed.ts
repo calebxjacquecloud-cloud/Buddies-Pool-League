@@ -9,9 +9,6 @@ const NAMES = [
   'Danny O', 'Wes Fischer',
 ];
 
-/** Fake 555-01xx numbers are reserved for fiction and never reach real people. */
-const fakePhone = (i: number) => `(303) 555-01${String(i).padStart(2, '0')}`;
-
 /** Deterministic pseudo-random numbers so the demo data is the same every time. */
 function rng(seed: number) {
   let s = seed >>> 0;
@@ -42,9 +39,9 @@ export async function seedDemoData(service: Service, store: Store, opts: { today
   const rand = rng(42);
   const existing = await store.listPlayers();
   const players = [];
-  for (const [i, name] of NAMES.entries()) {
+  for (const name of NAMES) {
     const found = existing.find((p) => p.display_name === name);
-    players.push(found ?? (await service.createPlayer({ name, phone: i % 3 === 2 ? null : fakePhone(i) })));
+    players.push(found ?? (await service.createPlayer({ name })));
   }
   // Skill rating per player: lower index = stronger.
   const skill = new Map(players.map((p, i) => [p.id, 1 - i / players.length + rand() * 0.2]));
@@ -62,7 +59,7 @@ export async function seedDemoData(service: Service, store: Store, opts: { today
     const pool = [...players].sort(() => rand() - 0.5).slice(0, count);
     const t = await service.createTournament({ date: d, settings: { tables: count > 10 ? 2 : 1 } });
     for (const p of pool) await service.addEntrant({ tournamentId: t.id, playerId: p.id });
-    await service.startTournament({ tournamentId: t.id, sendTexts: false });
+    await service.startTournament({ tournamentId: t.id });
     let state = await service.sync(t.id);
     let events = await store.listEvents(t.id);
     while (!state.complete) {

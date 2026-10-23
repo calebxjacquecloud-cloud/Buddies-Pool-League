@@ -4,8 +4,7 @@ import { MAX_PLAYERS, MIN_PLAYERS, nextPowerOfTwo } from '../../engine';
 import { Stepper, Toggle, useConfirm, useToast } from '../../components/ui';
 import type { LiveTournament } from '../../hooks/data';
 import { useHostAction } from '../../hooks/host';
-import type { HostPlayer, TournamentSettings } from '../../shared/model';
-import type { SmsSummary } from '../../shared/service';
+import type { Player, TournamentSettings } from '../../shared/model';
 import { formatDate, shuffle } from '../../shared/util';
 import type { useHostData } from './HostTournament';
 import { PlayerEditModal, PlayerPicker } from './PlayerPicker';
@@ -19,12 +18,11 @@ export function Registration({ t, host, refresh }: { t: LiveTournament; host: Ho
   const toast = useToast();
   const confirm = useConfirm();
   const navigate = useNavigate();
-  const [editing, setEditing] = useState<HostPlayer | null>(null);
+  const [editing, setEditing] = useState<Player | null>(null);
 
   const entrants = useMemo(() => [...bundle.entrants].sort((a, b) => a.seed - b.seed), [bundle.entrants]);
   const entered = useMemo(() => new Set(entrants.map((e) => e.player_id)), [entrants]);
   const byId = useMemo(() => new Map(host.players.map((p) => [p.id, p])), [host.players]);
-  const withPhone = entrants.filter((e) => byId.get(e.player_id)?.phone && !byId.get(e.player_id)?.opted_out).length;
   const n = entrants.length;
 
   const after = async (ok: unknown) => {
@@ -41,13 +39,6 @@ export function Registration({ t, host, refresh }: { t: LiveTournament; host: Ho
   };
 
   const start = async () => {
-    const smsNote = (
-      <p>
-        {withPhone > 0
-          ? `${withPhone} player${withPhone === 1 ? '' : 's'} with a phone number will get a text with their personal link (if texting is set up).`
-          : 'Nobody has a phone number, so no texts will go out. You can share links from the Players tab.'}
-      </p>
-    );
     const ok = await confirm({
       title: `Start with ${n} players?`,
       body: (
@@ -56,22 +47,15 @@ export function Registration({ t, host, refresh }: { t: LiveTournament; host: Ho
             {tour.settings.randomSeeding ? 'The draw will be random.' : 'Seeds are locked in the order shown.'} Bracket size {nextPowerOfTwo(n)}
             {nextPowerOfTwo(n) > n ? ` (${nextPowerOfTwo(n) - n} bye${nextPowerOfTwo(n) - n === 1 ? '' : 's'})` : ''}.
           </p>
-          {smsNote}
+          <p>Then tap 📺 TV Mode so players can scan the QR code to find their name.</p>
         </>
       ),
       confirm: '🎱 Start Tournament',
     });
     if (!ok) return;
-    const res = await run<{ sms: SmsSummary }>('startTournament', { tournamentId: tour.id });
-    if (!res) return;
+    if ((await run('startTournament', { tournamentId: tour.id })) === undefined) return;
     await refresh();
-    const { sms } = res;
-    toast({
-      tone: 'ok',
-      text: sms.configured
-        ? `Tournament started! Texts sent: ${sms.sent}${sms.failed ? `, failed: ${sms.failed}` : ''}`
-        : 'Tournament started! Texting isn’t set up. Share links from the Players tab.',
-    });
+    toast({ tone: 'ok', text: 'Tournament started! Put TV Mode up so players can scan the QR code.' });
   };
 
   return (
@@ -124,7 +108,6 @@ export function Registration({ t, host, refresh }: { t: LiveTournament; host: Ho
                   <span className="w-8 text-right font-black text-faint tabular-nums">{tour.settings.randomSeeding ? '•' : i + 1}</span>
                   <span className="flex-1 min-w-0">
                     <span className="block truncate text-lg font-semibold">{t.name(e.player_id)}</span>
-                    <span className="text-xs text-muted">{p?.phone ? (p.opted_out ? '📵 opted out of texts' : '📱 will get a text') : 'no phone'}</span>
                   </span>
                   {!tour.settings.randomSeeding && (
                     <>
@@ -137,7 +120,7 @@ export function Registration({ t, host, refresh }: { t: LiveTournament; host: Ho
                     </>
                   )}
                   <button className="btn-ghost btn-sm" onClick={() => p && setEditing(p)} disabled={!p}>
-                    {p?.phone ? 'Edit' : '＋📱'}
+                    Edit
                   </button>
                   <button className="btn-ghost btn-sm w-11 text-danger" onClick={() => remove(e.player_id)} disabled={busy} aria-label={`Remove ${t.name(e.player_id)}`}>
                     ✕
@@ -168,12 +151,6 @@ export function Registration({ t, host, refresh }: { t: LiveTournament; host: Ho
           hint="If the losers-bracket champ wins the final, play one more"
           checked={tour.settings.grandFinalReset}
           onChange={(v) => setSettings({ grandFinalReset: v })}
-        />
-        <Toggle
-          label="“You’re up next” texts"
-          hint="Text players when their match is next"
-          checked={tour.settings.upNextTexts}
-          onChange={(v) => setSettings({ upNextTexts: v })}
         />
       </section>
 

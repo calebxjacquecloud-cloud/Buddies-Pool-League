@@ -5,10 +5,9 @@ Practice round 6:30pm · Tournament 7:00pm.
 
 - **Host dashboard** on the bar's iPad: register players, start the bracket, tap winners.
 - **TV mode** mirrored to the TV (or opened directly on a smart TV): the whole bracket, live.
-- **Players follow along on their phones**: a personal link shows their next opponent, how many matches until they're up, and their stats.
+- **Players follow along on their phones**: they scan the QR code on the TV, tap their name, and see their next opponent, how many matches until they're up, and their stats.
 - **Double elimination** with byes, grand-final bracket reset, undo, corrections, withdrawals and late entries.
 - **Stats over time**: leaderboard (all-time and by season), titles, win %, streaks, week-by-week history.
-- **Text messages** (Twilio) when the tournament starts, with a no-Twilio fallback that works on day one.
 
 Everything runs in the cloud (Netlify + Supabase), so nothing has to stay running on your own computer.
 
@@ -21,8 +20,7 @@ Everything runs in the cloud (Netlify + Supabase), so nothing has to stay runnin
    1. [Create the database (Supabase)](#step-1--create-the-database-supabase)
    2. [Put the site online (Netlify)](#step-2--put-the-site-online-netlify)
    3. [Optional: load demo data](#step-3--optional-load-demo-data)
-   4. [Set up text messages (Twilio)](#step-4--set-up-text-messages-twilio)
-   5. [Set up the iPad and TV](#step-5--set-up-the-ipad-and-the-tv)
+   4. [Set up the iPad and TV](#step-4--set-up-the-ipad-and-the-tv)
 3. [Bracket rules the app follows](#bracket-rules-the-app-follows)
 4. [Privacy and security](#privacy-and-security)
 5. [Troubleshooting](#troubleshooting)
@@ -33,19 +31,18 @@ Everything runs in the cloud (Netlify + Supabase), so nothing has to stay runnin
 ## How a Thursday works
 
 1. Open the app on the iPad (home-screen icon) → **Host** → enter the PIN → **＋ New Thursday Tournament** (the date defaults to today).
-2. **Add players.** Start typing a name: returning players pop up, so tap them. New players: tap **＋ Add new player**, optionally add a mobile number. If a name looks like an existing player ("Jen Alvarez" vs "Jenn Alvarez"), the app asks before creating a duplicate.
-3. Check the settings (number of pool tables, random draw, bracket reset, "up next" texts), then tap **🎱 Start Tournament**. The bracket is drawn, texts go out, and you can tap **📺 TV Mode**.
+2. **Add players.** Start typing a name: returning players pop up, so tap them. New players: tap **＋ Add new player**. If a name looks like an existing player ("Jen Alvarez" vs "Jenn Alvarez"), the app asks before creating a duplicate.
+3. Check the settings (number of pool tables, random draw, bracket reset), then tap **🎱 Start Tournament**. The bracket is drawn. Tap **📺 TV Mode**: the TV shows the bracket and a QR code players scan to find their name.
 4. On the **Matches** tab, each table shows two big buttons. **Tap the winner.** The bracket, the TV and everyone's phones update by themselves. Made a mistake? Tap **Undo** in the message that pops up (or the ↶ Undo button). To fix an older result, open the **Bracket** tab and tap that match.
 5. When the final is decided, the champion screen appears and the results are saved to history automatically.
 
-**Players tab:** share each player's personal link (💬 **Share via Messages** opens the iPad's Messages app with the text ready), add a late player, or **Withdraw** someone who left.
-**Texts tab:** see who got the start text, and resend if any failed.
+**Players tab:** see everyone's status, add a late player, or **Withdraw** someone who left.
 
 ---
 
 ## Setup guide
 
-You'll create three free accounts: **GitHub** (you already have it; it holds the code), **Supabase** (the database) and **Netlify** (the website). Twilio (texting) is optional and can come later.
+You'll use three free accounts: **GitHub** (you already have it; it holds the code), **Supabase** (the database) and **Netlify** (the website).
 
 > 💡 Until Supabase is connected, the site runs in **demo mode**: it works, but data is saved only in that one browser. A blue banner at the top tells you when you're in demo mode. The demo host PIN is `1234`.
 
@@ -84,8 +81,7 @@ You'll create three free accounts: **GitHub** (you already have it; it holds the
 
    Only the two `VITE_` values end up in the website itself; they're safe to be public because the database only lets the public *read*. The secret key and the PIN are only used on Netlify's servers.
 5. Click **Deploy**. After a minute your site is live at something like `https://random-name-123.netlify.app`.
-6. Give it a nicer name: **Site configuration → Change site name** → e.g. `buddies-pool` → `https://buddies-pool.netlify.app`.
-   - Using your own domain (e.g. `pool.buddiesdenver.com`)? Add it under **Domain management**, then add an env var `PUBLIC_SITE_URL` = `https://pool.buddiesdenver.com` so texted links use it.
+6. Give it a nicer name: **Site configuration → Change site name** → e.g. `buddies-pool` → `https://buddies-pool.netlify.app`. (Own domain, like `pool.buddiesdenver.com`? Add it under **Domain management**.)
 7. **Any time you change an environment variable, redeploy:** **Deploys → Trigger deploy → Deploy site**.
 8. Test it: open the site, tap **Host**, enter your PIN, create a tournament. The blue "demo mode" banner should be gone.
 
@@ -103,51 +99,9 @@ cp .env.example .env      # then edit .env: fill in SUPABASE_URL and SUPABASE_SE
 npm run seed              # adds 20 fake players and 6 past Thursdays
 ```
 
-Demo players use fake 555-01xx phone numbers and seeding never sends texts. To remove the demo data later, delete those tournaments from the host dashboard (or ask a developer to clear the tables).
+To remove the demo data later, delete those tournaments from the host dashboard (or ask a developer to clear the tables).
 
-### Step 4 — Set up text messages (Twilio)
-
-The app is fully usable **without** this step: use **💬 Share via Messages** on the Players tab, or let players scan the QR code on the TV. Do this when you're ready for automatic texts.
-
-> ⚠️ **US carriers require registration before texts deliver reliably.** Unregistered business texts get blocked. Approval takes anywhere from a few days to a few weeks, so start early. Twilio charges small per-message and monthly registration fees; see Twilio's current pricing.
-
-1. **Create an account** at **https://www.twilio.com/try-twilio** and verify your email and phone.
-2. **Upgrade** the account (add a payment method). Trial accounts can only text numbers you've verified yourself.
-3. **Choose a number type and register it.** Pick **one**:
-   - **Option A: Toll-free number (often the simplest for one small business).**
-     Console → **Phone Numbers → Buy a number** → filter *Toll-free* → buy one.
-     Then **Messaging → Regulatory Compliance → Toll-Free Verifications** (or open the number and click *Submit verification*) and fill in the form (details below).
-   - **Option B: Local Denver number (303/720) with US A2P 10DLC.**
-     Buy a local number, then go to **Messaging → Regulatory Compliance → A2P 10DLC** (*Onboarding*):
-     1. Register your **Brand** (BUDDIES' legal business name, EIN, address; or *Sole Proprietor* if there's no EIN).
-     2. Create a **Messaging Service** (**Messaging → Services → Create**) and add your number to its *Sender Pool*.
-     3. Register a **Campaign** on that Messaging Service.
-
-   What to enter for the use case, in either form:
-   - **Use case:** Account notifications / mixed, low volume.
-   - **Description:** "Notifications for a weekly pool tournament at BUDDIES bar in Denver: a text when the tournament starts with a link to the player's bracket, and optionally when their match is next."
-   - **How people opt in:** "Players give their mobile number to bar staff when registering for the tournament and agree to receive tournament texts. Every message says Reply STOP to opt out."
-   - **Sample messages:**
-     - `🎱 BUDDIES Thursday Pool has started! See your bracket, stats, and when you're up next: https://buddies-pool.netlify.app/p/abc123 Reply STOP to opt out.`
-     - `🎱 BUDDIES: You're up next on table 1 vs Sam! https://buddies-pool.netlify.app/p/abc123 Reply STOP to opt out.`
-   - **Opt-out keywords:** STOP (Twilio handles STOP/START/HELP replies automatically).
-4. **Add the Twilio keys to Netlify** (Site configuration → Environment variables), then redeploy:
-
-   | Key | Where to find it |
-   |---|---|
-   | `TWILIO_ACCOUNT_SID` | Twilio Console home page → *Account Info* (starts with `AC`) |
-   | `TWILIO_AUTH_TOKEN` | same place (click *Show*) |
-   | `TWILIO_MESSAGING_SERVICE_SID` | **Messaging → Services** → your service (starts with `MG`). Recommended for 10DLC. |
-   | `TWILIO_FROM_NUMBER` | *or*, instead of a Messaging Service, your Twilio number in `+1XXXXXXXXXX` format |
-
-5. **Point STOP replies at the app** so it never texts people who opted out:
-   - Using a **Messaging Service**: **Messaging → Services → your service → Integration** → *Incoming Messages* → **Send a webhook** → Request URL:
-     `https://YOUR-SITE.netlify.app/.netlify/functions/sms-inbound` → **Save**.
-   - Using just a **phone number**: **Phone Numbers → Manage → Active numbers** → click the number → *Messaging Configuration* → **A message comes in** → *Webhook* → the same URL, **HTTP POST** → **Save configuration**.
-   - The app checks Twilio's signature on every webhook, so only Twilio can mark numbers as opted out. If you use a custom domain, use that domain in the URL and set `PUBLIC_SITE_URL` to match.
-6. **Test:** create a test tournament with your own number, start it, and check that the text arrives. Reply `STOP`; in **Host → Players** your number should show *Opted out*. Reply `START` to opt back in.
-
-### Step 5 — Set up the iPad and the TV
+### Step 4 — Set up the iPad and the TV
 
 **Install the app on the iPad:**
 1. Open **Safari** and go to `https://YOUR-SITE.netlify.app/host`.
@@ -160,7 +114,7 @@ The app is fully usable **without** this step: use **💬 Share via Messages** o
 - **AirPlay mirroring:** on the iPad, open Control Center → **Screen Mirroring** → pick the Apple TV / AirPlay TV. Then tap **📺 TV Mode** in the app. To get back, tap the screen and press **Exit TV**.
 - **Directly on a smart TV or a second device** (so the iPad stays free): open the TV's web browser and go to `https://YOUR-SITE.netlify.app/tv/<tournament id>`. The easiest way to get that address: on the iPad, open the tournament's public page (Live → Bracket → **📺 TV view**) and copy the URL. TV mode is read-only and updates by itself.
 
-TV mode shows a **QR code**; players scan it, tap their name, and get their personal page with no texting needed.
+TV mode shows a **QR code**; players scan it with their phone camera, tap their name, and get their own page: status, next opponent, matches until they're up, and stats. It updates by itself, so they can leave it open all night.
 
 ---
 
@@ -182,11 +136,9 @@ TV mode shows a **QR code**; players scan it, tap their name, and get their pers
 
 ## Privacy and security
 
-- **Phone numbers are private.** They're stored in a table the public can't read, are only shown to the host, and never appear on the TV, the bracket or public pages. Stored in standard `+1XXXXXXXXXX` format.
+- **No personal info is collected.** The app stores only display names and results. No phone numbers, emails or accounts.
 - **The public can only read.** The website uses Supabase's publishable key with Row Level Security: read-only access to names, brackets and results. Every change goes through a Netlify Function that checks the host's signed session first.
 - **Host PIN** is checked on the server (never in the browser), with a limit on wrong guesses per network address (8 per 15 minutes).
-- **Personal links** use long random tokens (impossible to guess) and show nothing private.
-- **Opt-outs** are recorded from Twilio's webhook (signature-verified), and opted-out numbers are never texted.
 
 ---
 
@@ -200,14 +152,14 @@ TV mode shows a **QR code**; players scan it, tap their name, and get their pers
 | Yellow "Reconnecting…" badge | The device lost internet. Nothing is lost: results live in the database. It catches up automatically when Wi-Fi returns. |
 | "The bracket changed on another device" | Two people tapped at once; the screen has refreshed. Check the bracket and tap again if needed. |
 | TV/phones don't update live | Supabase → Database → Publications → `supabase_realtime` must include `tournaments`, `entrants`, `tournament_events`. Pages also refresh when reopened. |
-| Texts don't arrive | Check the Texts tab for the error. Most often the number/campaign isn't approved yet (Step 4), or the player replied STOP. Use Share via Messages meanwhile. |
+| QR code opens the wrong site | The QR code uses the address the TV page was opened from. Open TV mode from your real site address (not a preview link). |
 | Supabase project "paused" | Free projects pause after a period of inactivity. The app pings the database daily to prevent this; if it happens anyway, click **Restore** in the Supabase dashboard. |
 
 ---
 
 ## For developers
 
-**Stack:** React 19 + Vite + TypeScript + Tailwind CSS 4 · Netlify (static site + Functions) · Supabase (Postgres + Realtime) · Twilio REST API.
+**Stack:** React 19 + Vite + TypeScript + Tailwind CSS 4 · Netlify (static site + Functions) · Supabase (Postgres + Realtime).
 
 ```bash
 npm install
@@ -226,17 +178,17 @@ To run with real Netlify Functions locally, use the Netlify CLI: `npx netlify-cl
 src/
   engine/            Pure double-elimination engine (no framework, no I/O) + tests
   shared/            Code shared by browser and functions:
-    service.ts         every host action (validation, writes, texts)
+    service.ts         every host action (validation, writes)
     store.ts           storage interface; memoryStore.ts = in-memory implementation
-    stats.ts           leaderboard/player stats; names.ts, phone.ts, messages.ts
+    stats.ts           leaderboard/player stats; names.ts (duplicate-name checks)
     seed.ts            demo data generator
   data/              Browser data layer: SupabaseBackend (prod) / DemoBackend (no config)
   components/        Bracket, TV fit-to-screen, QR, UI kit
   hooks/             live data, host actions, stats, wake lock
   pages/             public pages, TV, player view, host/ (dashboard, registration, run view)
 netlify/
-  functions/         api (host actions), host-login, player-link, sms-inbound, keep-alive (daily)
-  lib/               SupabaseStore, auth (signed host sessions), Twilio client + signature check
+  functions/         api (host actions), host-login, keep-alive (daily)
+  lib/               SupabaseStore, auth (signed host sessions)
   tests/             function handler tests
 supabase/migrations/ SQL schema, indexes, RLS policies, RPCs (+ migration.test.ts)
 scripts/seed.ts      seeds Supabase with demo data
@@ -258,7 +210,4 @@ scripts/seed.ts      seeds Supabase with demo data
 | `SUPABASE_URL` | functions | Supabase project URL |
 | `SUPABASE_SERVICE_ROLE_KEY` | functions | secret/service_role key; never expose to the browser |
 | `HOST_PIN` | functions | host PIN; also part of the session signing key |
-| `PUBLIC_SITE_URL` | functions | base URL for texted links (defaults to Netlify's `URL`) |
-| `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN` | functions | Twilio credentials |
-| `TWILIO_MESSAGING_SERVICE_SID` or `TWILIO_FROM_NUMBER` | functions | sender |
 | `VITE_DEMO_PIN` | browser (demo only) | PIN in demo mode (default `1234`) |

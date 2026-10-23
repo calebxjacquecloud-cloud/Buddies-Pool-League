@@ -3,11 +3,6 @@ import type { Season, StatsData, Tournament, TournamentBundle } from '../shared/
 
 export type ConnectionStatus = 'online' | 'reconnecting' | 'offline';
 
-export interface PlayerLink {
-  tournamentId: string;
-  playerId: string;
-}
-
 /** Everything the UI needs from the server. */
 export interface Backend {
   readonly mode: 'supabase' | 'demo';
@@ -17,7 +12,6 @@ export interface Backend {
   listTournaments(): Promise<Tournament[]>;
   getStatsData(): Promise<StatsData>;
   listSeasons(): Promise<Season[]>;
-  resolvePlayerLink(token: string): Promise<PlayerLink | null>;
   /** Calls onChange whenever data for this tournament (or anything, with '*') changes. */
   subscribe(scope: string, onChange: () => void): () => void;
   onStatus(cb: (s: ConnectionStatus) => void): () => void;

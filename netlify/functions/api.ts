@@ -14,7 +14,7 @@ export default async (req: Request, _context: Context) => {
     if (!verifyToken(bearer(req))) throw new AppError('Please enter the host PIN again', 401, 'AUTH');
     const { action, payload } = (await req.json()) as { action?: string; payload?: unknown };
     if (!action) throw new AppError('Missing action');
-    const { service } = makeService(req);
+    const { service } = makeService();
     const result = await dispatch(service, action, payload);
     return json({ ok: true, result: result ?? null });
   } catch (e) {

@@ -5,8 +5,8 @@
 --     tables below. Row Level Security has no insert/update/delete policies, so
 --     every write is rejected unless it comes from a Netlify Function using the
 --     secret (service_role) key, which checks the host PIN first.
---   * Phone numbers, personal-link tokens, the text log and login attempts live
---     in tables with RLS enabled and NO policies: invisible to the public.
+--   * Host login attempts live in a table with RLS enabled and NO policies:
+--     invisible to the public. No phone numbers or other contact info are stored.
 
 
 -- ---------------------------------------------------------------- players
@@ -17,14 +17,6 @@ create table public.players (
   name_key text not null unique check (name_key <> ''),
   created_at timestamptz not null default now()
 );
-
-create table public.player_private (
-  player_id uuid primary key references public.players(id) on delete cascade,
-  phone text check (phone is null or phone ~ '^\+1[2-9][0-9]{2}[2-9][0-9]{6}$'),
-  opted_out boolean not null default false,
-  updated_at timestamptz not null default now()
-);
-create index player_private_phone_idx on public.player_private (phone);
 
 -- ------------------------------------------------------------ tournaments
 create table public.tournaments (
@@ -77,27 +69,6 @@ create table public.matches (
 create index matches_winner_idx on public.matches (winner_id);
 create index matches_loser_idx on public.matches (loser_id);
 
--- Unguessable personal links texted to each player.
-create table public.entrant_tokens (
-  token text primary key check (char_length(token) >= 20),
-  tournament_id uuid not null references public.tournaments(id) on delete cascade,
-  player_id uuid not null references public.players(id) on delete cascade,
-  unique (tournament_id, player_id)
-);
-
-create table public.sms_log (
-  id bigint generated always as identity primary key,
-  tournament_id uuid not null references public.tournaments(id) on delete cascade,
-  player_id uuid not null references public.players(id) on delete cascade,
-  kind text not null check (kind in ('start', 'up_next')),
-  match_id text not null default '',
-  phone text not null,
-  status text not null check (status in ('sent', 'failed', 'skipped')),
-  error text,
-  created_at timestamptz not null default now(),
-  unique (tournament_id, player_id, kind, match_id)
-);
-
 create table public.seasons (
   id uuid primary key default gen_random_uuid(),
   name text not null,
@@ -116,13 +87,10 @@ create index host_login_attempts_ip_idx on public.host_login_attempts (ip, creat
 
 -- ------------------------------------------------------- row level security
 alter table public.players enable row level security;
-alter table public.player_private enable row level security;
 alter table public.tournaments enable row level security;
 alter table public.entrants enable row level security;
 alter table public.tournament_events enable row level security;
 alter table public.matches enable row level security;
-alter table public.entrant_tokens enable row level security;
-alter table public.sms_log enable row level security;
 alter table public.seasons enable row level security;
 alter table public.host_login_attempts enable row level security;
 
@@ -133,11 +101,11 @@ create policy "public read entrants" on public.entrants for select to anon, auth
 create policy "public read events" on public.tournament_events for select to anon, authenticated using (true);
 create policy "public read matches" on public.matches for select to anon, authenticated using (true);
 create policy "public read seasons" on public.seasons for select to anon, authenticated using (true);
--- player_private, entrant_tokens, sms_log, host_login_attempts: no policies = no public access.
+-- host_login_attempts: no policies = no public access.
 
 -- Belt and braces: the browser roles can never write, even if a policy is added by mistake.
 revoke insert, update, delete, truncate on all tables in schema public from anon, authenticated;
-revoke all on public.player_private, public.entrant_tokens, public.sms_log, public.host_login_attempts from anon, authenticated;
+revoke all on public.host_login_attempts from anon, authenticated;
 
 -- --------------------------------------------------------- atomic event writes
 -- Replaces events from position p_from onward, but only if the tournament has

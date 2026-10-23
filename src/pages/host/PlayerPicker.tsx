@@ -1,9 +1,8 @@
 import { useMemo, useState } from 'react';
 import { Modal } from '../../components/ui';
 import { useHostAction } from '../../hooks/host';
-import type { HostPlayer, Player } from '../../shared/model';
+import type { Player } from '../../shared/model';
 import { nameKey, searchPlayers, similarNames } from '../../shared/names';
-import { formatPhone, toE164 } from '../../shared/phone';
 
 /**
  * Search returning players or add a new one. Warns about similar names so the
@@ -17,7 +16,7 @@ export function PlayerPicker({
   disabled,
   placeholder = 'Search players or type a new name',
 }: {
-  players: HostPlayer[];
+  players: Player[];
   entered: Set<string>;
   onPick: (playerId: string) => Promise<void> | void;
   onCreated: () => void;
@@ -80,7 +79,6 @@ export function PlayerPicker({
               >
                 <span className="text-lg font-semibold">{p.display_name}</span>
                 <span className="flex items-center gap-2 text-sm">
-                  {p.phone && <span title="Has a phone number">📱</span>}
                   {isIn ? <span className="chip bg-felt/20 text-felt">✓ In</span> : <span className="chip bg-surface-3 text-ink">Add</span>}
                 </span>
               </button>
@@ -117,7 +115,7 @@ function NewPlayerModal({
   onCreated,
 }: {
   name: string | null;
-  players: HostPlayer[];
+  players: Player[];
   onClose: () => void;
   onUseExisting: (id: string) => void;
   onCreated: (p: Player) => void;
@@ -136,22 +134,20 @@ function NewPlayerForm({
   onCreated,
 }: {
   initialName: string;
-  players: HostPlayer[];
+  players: Player[];
   onUseExisting: (id: string) => void;
   onCreated: (p: Player) => void;
 }) {
   const [name, setName] = useState(initialName);
-  const [phone, setPhone] = useState('');
   const { run, busy } = useHostAction();
   const similar = similarNames(name, players);
-  const phoneOk = !phone.trim() || !!toE164(phone);
 
   return (
     <form
       className="space-y-4"
       onSubmit={async (e) => {
         e.preventDefault();
-        const p = await run<Player>('createPlayer', { name, phone: phone.trim() || null });
+        const p = await run<Player>('createPlayer', { name });
         if (p) onCreated(p);
       }}
     >
@@ -170,20 +166,15 @@ function NewPlayerForm({
           ))}
         </div>
       )}
-      <label className="block">
-        <span className="label">Mobile number (optional, private, only used for tournament texts)</span>
-        <input className="field text-lg" value={phone} onChange={(e) => setPhone(e.target.value)} inputMode="tel" autoComplete="off" placeholder="(303) 555-1234" />
-        {!phoneOk && <span className="text-danger text-sm">Enter a 10-digit US number</span>}
-      </label>
-      <button className="btn-primary w-full btn-lg" disabled={busy || !name.trim() || !phoneOk}>
+      <button className="btn-primary w-full btn-lg" disabled={busy || !name.trim()}>
         {similar.length ? 'Create as a new player anyway' : 'Add player'}
       </button>
     </form>
   );
 }
 
-/** Edit a player's phone number (and name). */
-export function PlayerEditModal({ player, onClose, onSaved }: { player: HostPlayer | null; onClose: () => void; onSaved: () => void }) {
+/** Fix a player's display name. */
+export function PlayerEditModal({ player, onClose, onSaved }: { player: Player | null; onClose: () => void; onSaved: () => void }) {
   return (
     <Modal open={!!player} onClose={onClose} title={player ? `Edit ${player.display_name}` : ''}>
       {player && <PlayerEditForm key={player.id} player={player} onSaved={onSaved} />}
@@ -191,17 +182,15 @@ export function PlayerEditModal({ player, onClose, onSaved }: { player: HostPlay
   );
 }
 
-function PlayerEditForm({ player, onSaved }: { player: HostPlayer; onSaved: () => void }) {
+function PlayerEditForm({ player, onSaved }: { player: Player; onSaved: () => void }) {
   const [name, setName] = useState(player.display_name);
-  const [phone, setPhone] = useState(formatPhone(player.phone));
   const { run, busy } = useHostAction();
-  const phoneOk = !phone.trim() || !!toE164(phone);
   return (
     <form
       className="space-y-4"
       onSubmit={async (e) => {
         e.preventDefault();
-        const res = await run('updatePlayer', { id: player.id, name, phone: phone.trim() || null });
+        const res = await run('updatePlayer', { id: player.id, name });
         if (res !== undefined) onSaved();
       }}
     >
@@ -209,17 +198,7 @@ function PlayerEditForm({ player, onSaved }: { player: HostPlayer; onSaved: () =
         <span className="label">Display name</span>
         <input className="field text-lg" value={name} onChange={(e) => setName(e.target.value)} maxLength={40} />
       </label>
-      <label className="block">
-        <span className="label">Mobile number (private)</span>
-        <input className="field text-lg" value={phone} onChange={(e) => setPhone(e.target.value)} inputMode="tel" placeholder="(303) 555-1234" />
-        {!phoneOk && <span className="text-danger text-sm">Enter a 10-digit US number</span>}
-      </label>
-      {player.opted_out && (
-        <p className="rounded-xl bg-danger/15 text-danger p-3 text-sm font-semibold">
-          This number replied STOP and won't get texts. They can text START to opt back in.
-        </p>
-      )}
-      <button className="btn-primary w-full" disabled={busy || !name.trim() || !phoneOk}>
+      <button className="btn-primary w-full" disabled={busy || !name.trim()}>
         Save
       </button>
     </form>

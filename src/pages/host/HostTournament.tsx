@@ -3,48 +3,30 @@ import { Link, useParams } from 'react-router-dom';
 import { Empty, Spinner } from '../../components/ui';
 import { backend } from '../../data';
 import { useTournament } from '../../hooks/data';
-import type { HostPlayer, SmsLog } from '../../shared/model';
+import type { Player } from '../../shared/model';
 import { Registration } from './Registration';
 import { RunView } from './RunView';
 
-export interface HostExtras {
-  links: Record<string, string>;
-  phones: Record<string, { phone: string | null; opted_out: boolean }>;
-  sms: SmsLog[];
-  smsConfigured: boolean;
-}
-
-/** Loads the host-only data (roster with phones, personal links, text log). */
-export function useHostData(tournamentId: string, version: string | undefined) {
-  const [players, setPlayers] = useState<HostPlayer[]>([]);
-  const [extras, setExtras] = useState<HostExtras | null>(null);
+/** The full player roster, for registration and late entry. */
+export function useHostData() {
+  const [players, setPlayers] = useState<Player[]>([]);
   const reloadPlayers = useCallback(async () => {
     try {
-      setPlayers(await backend.host<HostPlayer[]>('hostPlayers'));
+      setPlayers(await backend.host<Player[]>('hostPlayers'));
     } catch {
-      // shown elsewhere; keep the last list
+      // keep the last list
     }
   }, []);
-  const reloadExtras = useCallback(async () => {
-    try {
-      setExtras(await backend.host<HostExtras>('hostTournamentExtras', { tournamentId }));
-    } catch {
-      // keep the last value
-    }
-  }, [tournamentId]);
   useEffect(() => {
     void reloadPlayers();
   }, [reloadPlayers]);
-  useEffect(() => {
-    void reloadExtras();
-  }, [reloadExtras, version]);
-  return { players, extras, reloadPlayers, reloadExtras };
+  return { players, reloadPlayers };
 }
 
 export function HostTournament() {
   const { id } = useParams();
   const { t, refresh } = useTournament(id);
-  const host = useHostData(id!, t?.bundle.tournament.updated_at);
+  const host = useHostData();
 
   if (t === undefined) return <Spinner />;
   if (t === null)

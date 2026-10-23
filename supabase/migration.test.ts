@@ -38,9 +38,8 @@ beforeAll(async () => {
   }
   await db.exec(`
     insert into players(id, display_name, name_key) values ('${A}','A','a'),('${B}','B','b');
-    insert into player_private values ('${A}','+13035550101',false,now());
     insert into tournaments(id,date,name) values ('${T}','2026-10-22','T');
-    insert into entrant_tokens values ('abcdefghijklmnopqrstuvwxyz', '${T}', '${A}');`);
+    insert into host_login_attempts(ip, ok) values ('1.2.3.4', false);`);
 }, 60_000);
 
 describe('migration', () => {
@@ -55,7 +54,7 @@ describe('migration', () => {
   });
 
   it('hides private tables from the public', async () => {
-    for (const table of ['player_private', 'entrant_tokens', 'sms_log', 'host_login_attempts']) {
+    for (const table of ['host_login_attempts']) {
       const res = await as('anon', `select * from ${table}`);
       expect(res === 'ERR: permission denied for table ' + table || (Array.isArray(res) && res.length === 0)).toBe(true);
     }
@@ -65,6 +64,7 @@ describe('migration', () => {
     expect(await as('anon', `insert into players(display_name,name_key) values ('x','x')`)).toMatch(/^ERR/);
     expect(await as('anon', `update tournaments set name='hacked'`)).toMatch(/^ERR/);
     expect(await as('anon', `delete from players`)).toMatch(/^ERR/);
+    expect(await as('anon', `insert into host_login_attempts(ip, ok) values ('x', true)`)).toMatch(/^ERR/);
     expect(await as('anon', `select write_events('${T}',0,0,'[]')`)).toMatch(/^ERR/);
     expect(await as('authenticated', `insert into tournament_events values ('${T}', 0, '{}', now())`)).toMatch(/^ERR/);
     expect(await as(null, `select name from tournaments`)).toEqual([{ name: 'T' }]);
@@ -78,11 +78,10 @@ describe('migration', () => {
     expect(await as('anon', `select seq, event->>'matchId' as m from tournament_events`)).toEqual([{ seq: 0, m: 'W1-1' }]);
   });
 
-  it('replaces matches and validates phones', async () => {
+  it('replaces matches', async () => {
     const rows = JSON.stringify([{ match_id: 'W1-1', bracket: 'W', round: 1, winner_id: A, loser_id: B, kind: 'normal', seq: 1 }]);
     await as('service_role', `select replace_matches('${T}','${rows}')`);
     await as('service_role', `select replace_matches('${T}','${rows}')`);
     expect(await as('anon', `select match_id, winner_id, loser_id from matches`)).toEqual([{ match_id: 'W1-1', winner_id: A, loser_id: B }]);
-    expect(await as('service_role', `insert into player_private values ('${B}','3035550101',false,now())`)).toMatch(/check constraint/);
   });
 });

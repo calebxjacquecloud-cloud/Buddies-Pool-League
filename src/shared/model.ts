@@ -10,25 +10,15 @@ export interface Player {
   created_at: string;
 }
 
-/** Private contact info. Never readable by the public. */
-export interface PlayerPrivate {
-  player_id: string;
-  phone: string | null; // E.164, e.g. +13035551234
-  opted_out: boolean;
-  updated_at: string;
-}
-
 export interface TournamentSettings {
   tables: number;
   grandFinalReset: boolean;
-  upNextTexts: boolean;
   randomSeeding: boolean;
 }
 
 export const DEFAULT_SETTINGS: TournamentSettings = {
   tables: 1,
   grandFinalReset: true,
-  upNextTexts: false,
   randomSeeding: true,
 };
 
@@ -75,25 +65,6 @@ export interface MatchRow {
   seq: number; // play order within the tournament
 }
 
-export interface EntrantToken {
-  token: string;
-  tournament_id: string;
-  player_id: string;
-}
-
-export type SmsKind = 'start' | 'up_next';
-
-export interface SmsLog {
-  tournament_id: string;
-  player_id: string;
-  kind: SmsKind;
-  match_id: string; // '' for start texts
-  phone: string;
-  status: 'sent' | 'failed' | 'skipped';
-  error: string | null;
-  created_at: string;
-}
-
 export interface Season {
   id: string;
   name: string;
@@ -115,9 +86,4 @@ export interface StatsData {
   tournaments: Tournament[];
   entrants: Entrant[];
   matches: MatchRow[];
-}
-
-export interface HostPlayer extends Player {
-  phone: string | null;
-  opted_out: boolean;
 }

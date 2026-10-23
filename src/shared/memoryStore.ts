@@ -1,38 +1,23 @@
 import type { EngineEvent } from '../engine';
-import type {
-  Entrant,
-  EntrantToken,
-  MatchRow,
-  Player,
-  PlayerPrivate,
-  Season,
-  SmsLog,
-  Tournament,
-} from './model';
+import type { Entrant, MatchRow, Player, Season, Tournament } from './model';
 import type { Store } from './store';
 import { AppError } from './util';
 
 export interface MemoryData {
   version: 1;
   players: Player[];
-  privates: PlayerPrivate[];
   tournaments: Tournament[];
   entrants: Entrant[];
   events: Record<string, EngineEvent[]>;
   matches: MatchRow[];
-  tokens: EntrantToken[];
-  sms: SmsLog[];
   seasons: Season[];
 }
 
 export function emptyData(): MemoryData {
-  return { version: 1, players: [], privates: [], tournaments: [], entrants: [], events: {}, matches: [], tokens: [], sms: [], seasons: [] };
+  return { version: 1, players: [], tournaments: [], entrants: [], events: {}, matches: [], seasons: [] };
 }
 
 const clone = <T>(v: T): T => structuredClone(v);
-const smsKey = (r: Pick<SmsLog, 'tournament_id' | 'player_id' | 'kind' | 'match_id'>) =>
-  `${r.tournament_id}|${r.player_id}|${r.kind}|${r.match_id}`;
-
 /**
  * Store backed by a plain object. Used for unit tests and for demo mode, where
  * `onChange` persists the data to localStorage.
@@ -57,26 +42,6 @@ export class MemoryStore implements Store {
     this.changed();
   }
 
-  async listPrivate(ids?: string[]) {
-    return clone(ids ? this.data.privates.filter((p) => ids.includes(p.player_id)) : this.data.privates);
-  }
-  async upsertPrivate(p: PlayerPrivate) {
-    this.data.privates = this.data.privates.filter((x) => x.player_id !== p.player_id);
-    this.data.privates.push(clone(p));
-    this.changed();
-  }
-  async setOptOutByPhone(phone: string, optedOut: boolean) {
-    let n = 0;
-    for (const p of this.data.privates) {
-      if (p.phone === phone) {
-        p.opted_out = optedOut;
-        n++;
-      }
-    }
-    this.changed();
-    return n;
-  }
-
   async listTournaments() { return clone(this.data.tournaments); }
   async getTournament(id: string) { return clone(this.data.tournaments.find((t) => t.id === id) ?? null); }
   async insertTournament(t: Tournament) {
@@ -94,8 +59,6 @@ export class MemoryStore implements Store {
     d.tournaments = d.tournaments.filter((t) => t.id !== id);
     d.entrants = d.entrants.filter((e) => e.tournament_id !== id);
     d.matches = d.matches.filter((m) => m.tournament_id !== id);
-    d.tokens = d.tokens.filter((x) => x.tournament_id !== id);
-    d.sms = d.sms.filter((x) => x.tournament_id !== id);
     delete d.events[id];
     this.changed();
   }
@@ -135,28 +98,6 @@ export class MemoryStore implements Store {
   }
   async replaceMatches(tid: string, rows: MatchRow[]) {
     this.data.matches = [...this.data.matches.filter((m) => m.tournament_id !== tid), ...clone(rows)];
-    this.changed();
-  }
-
-  async listTokens(tid: string) { return clone(this.data.tokens.filter((x) => x.tournament_id === tid)); }
-  async getToken(token: string) { return clone(this.data.tokens.find((x) => x.token === token) ?? null); }
-  async insertTokens(rows: EntrantToken[]) {
-    this.data.tokens.push(...clone(rows));
-    this.changed();
-  }
-
-  async listSms(tid: string) { return clone(this.data.sms.filter((x) => x.tournament_id === tid)); }
-  async claimSms(row: SmsLog) {
-    const existing = this.data.sms.find((x) => smsKey(x) === smsKey(row));
-    if (existing && existing.status !== 'failed') return false;
-    if (existing) Object.assign(existing, clone(row));
-    else this.data.sms.push(clone(row));
-    this.changed();
-    return true;
-  }
-  async updateSms(row: Pick<SmsLog, 'tournament_id' | 'player_id' | 'kind' | 'match_id'> & Partial<SmsLog>) {
-    const existing = this.data.sms.find((x) => smsKey(x) === smsKey(row));
-    if (existing) Object.assign(existing, row);
     this.changed();
   }
 

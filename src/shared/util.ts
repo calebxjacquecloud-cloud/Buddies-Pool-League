@@ -20,15 +20,6 @@ export function uuid(): string {
   return globalThis.crypto.randomUUID();
 }
 
-/** Unguessable URL-safe token (128 bits). */
-export function randomToken(bytes = 16): string {
-  const buf = new Uint8Array(bytes);
-  globalThis.crypto.getRandomValues(buf);
-  let s = '';
-  for (const b of buf) s += String.fromCharCode(b);
-  return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
-
 export function shuffle<T>(items: T[]): T[] {
   const a = [...items];
   for (let i = a.length - 1; i > 0; i--) {

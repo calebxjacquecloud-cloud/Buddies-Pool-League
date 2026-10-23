@@ -2,7 +2,7 @@ import { createClient, type RealtimeChannel, type SupabaseClient } from '@supaba
 import type { EngineEvent } from '../engine';
 import type { HostAction } from '../shared/service';
 import type { Entrant, MatchRow, Season, StatsData, Tournament, TournamentBundle } from '../shared/model';
-import { ApiError, session, StatusHub, type Backend, type PlayerLink } from './backend';
+import { ApiError, session, StatusHub, type Backend } from './backend';
 
 /** Production backend: reads straight from Supabase, writes through Netlify Functions. */
 export class SupabaseBackend implements Backend {
@@ -71,13 +71,6 @@ export class SupabaseBackend implements Backend {
 
   listSeasons() {
     return this.q<Season[]>(this.db.from('seasons').select('*').order('start_date', { ascending: false }));
-  }
-
-  async resolvePlayerLink(token: string): Promise<PlayerLink | null> {
-    const res = await fetch(`/.netlify/functions/player-link?token=${encodeURIComponent(token)}`);
-    if (res.status === 404) return null;
-    if (!res.ok) throw new ApiError('Could not open your link. Check your connection.', res.status);
-    return res.json();
   }
 
   private markOnline() {

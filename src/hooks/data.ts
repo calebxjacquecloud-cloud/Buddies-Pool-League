@@ -82,13 +82,6 @@ export function useConnection(): ConnectionStatus {
   return s;
 }
 
-export function useIsIOS() {
-  return useMemo(
-    () => /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1),
-    [],
-  );
-}
-
 /** Re-renders when the host session changes. */
 export function useHostSession() {
   const [isHost, setIsHost] = useState(() => backend.hasHostSession());

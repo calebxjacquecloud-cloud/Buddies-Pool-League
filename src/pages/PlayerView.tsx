@@ -1,49 +1,14 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { BYE, matchLabel, matchesUntilUp, roundLabel, type BracketState, type PlayerState, type Source } from '../engine';
 import { Bracket } from '../components/Bracket';
 import { StatTiles } from '../components/StatTiles';
 import { Badge, Empty, Spinner } from '../components/ui';
-import { backend, type PlayerLink } from '../data';
 import { useTournament } from '../hooks/data';
 import { useStats } from '../hooks/stats';
 import { ordinal } from '../shared/util';
 
-/** /p/:token: the personal link texted to each player. */
-export function PlayerLinkPage() {
-  const { token } = useParams();
-  const [link, setLink] = useState<PlayerLink | null | undefined>(undefined);
-  const [error, setError] = useState<string | null>(null);
-  useEffect(() => {
-    let alive = true;
-    const load = async (attempt = 0): Promise<void> => {
-      try {
-        const res = await backend.resolvePlayerLink(token!);
-        if (alive) setLink(res);
-      } catch (e) {
-        if (!alive) return;
-        setError((e as Error).message);
-        setTimeout(() => void load(attempt + 1), Math.min(10000, 1000 * 2 ** attempt));
-      }
-    };
-    void load();
-    return () => {
-      alive = false;
-    };
-  }, [token]);
-  if (link === undefined) return error ? <Empty title="Reconnecting…">{error}</Empty> : <Spinner />;
-  if (link === null)
-    return (
-      <Empty title="This link isn't valid">
-        <Link to="/" className="btn-secondary mt-4">
-          See tonight's bracket
-        </Link>
-      </Empty>
-    );
-  return <PlayerPanel tournamentId={link.tournamentId} playerId={link.playerId} />;
-}
-
-/** /t/:id/p/:playerId: same view, reached from "find your name". */
+/** /t/:id/p/:playerId: a player's own page, reached from "find your name" (the TV's QR code). */
 export function PlayerPage() {
   const { id, playerId } = useParams();
   return <PlayerPanel tournamentId={id!} playerId={playerId!} />;

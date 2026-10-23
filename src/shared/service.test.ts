@@ -2,54 +2,28 @@ import { describe, expect, it } from 'vitest';
 import { computeBracket } from '../engine';
 import { MemoryStore } from './memoryStore';
 import { similarNames } from './names';
-import { toE164, smsKeyword } from './phone';
 import { seedDemoData } from './seed';
 import { Service } from './service';
 import { computeStats } from './stats';
-import type { Notifier } from './store';
 
-function setup(configured = false) {
+function setup() {
   const store = new MemoryStore();
-  const sent: { to: string; body: string }[] = [];
-  const notifier: Notifier = {
-    configured,
-    async send(to, body) {
-      sent.push({ to, body });
-      return { ok: true };
-    },
-  };
-  const service = new Service(store, notifier, { siteUrl: 'https://buddies.example' });
-  return { store, service, sent };
+  const service = new Service(store);
+  return { store, service };
 }
 
-async function tournamentWith(service: Service, names: string[], phones: (string | null)[] = []) {
+async function tournamentWith(service: Service, names: string[]) {
   const t = await service.createTournament({ date: '2026-10-22', settings: { randomSeeding: false } });
   const ids: string[] = [];
-  for (const [i, name] of names.entries()) {
-    const p = await service.createPlayer({ name, phone: phones[i] ?? null });
+  for (const name of names) {
+    const p = await service.createPlayer({ name });
     await service.addEntrant({ tournamentId: t.id, playerId: p.id });
     ids.push(p.id);
   }
   return { t, ids };
 }
 
-describe('phones and names', () => {
-  it('validates US numbers to E.164', () => {
-    expect(toE164('(303) 555-1234')).toBe('+13035551234');
-    expect(toE164('1-303-555-1234')).toBe('+13035551234');
-    expect(toE164('+1 303.555.1234')).toBe('+13035551234');
-    expect(toE164('555-1234')).toBeNull();
-    expect(toE164('(103) 555-1234')).toBeNull();
-    expect(toE164('(303) 155-1234')).toBeNull();
-  });
-
-  it('recognizes opt-out keywords', () => {
-    expect(smsKeyword('stop')).toBe('stop');
-    expect(smsKeyword(' Unsubscribe ')).toBe('stop');
-    expect(smsKeyword('START')).toBe('start');
-    expect(smsKeyword('stop texting me pls')).toBeNull();
-  });
-
+describe('names', () => {
   it('warns on similar names', () => {
     const players = [{ display_name: 'Marcus Bell' }, { display_name: 'Jen Alvarez' }, { display_name: 'Big Mike' }];
     expect(similarNames('marcus bel', players)).toEqual([players[0]]);
@@ -72,7 +46,6 @@ describe('service', () => {
     await expect(service.recordResult({ tournamentId: t.id, matchId: 'W1-2', winner: ids[3], expectedEvents: 0 })).rejects.toThrow(/not started/);
     await service.startTournament({ tournamentId: t.id });
     expect((await store.getTournament(t.id))!.status).toBe('live');
-    expect(await store.listTokens(t.id)).toHaveLength(5);
 
     let n = 0;
     for (;;) {
@@ -132,38 +105,12 @@ describe('service', () => {
     await service.addEntrant({ tournamentId: t.id, playerId: late.id });
     const entrants = await store.listEntrants(t.id);
     expect(entrants).toHaveLength(6);
-    expect(await store.listTokens(t.id)).toHaveLength(6);
     // A 7th player would take seed 2's bye (W1-3). Seed 3 beats Larry (W1-4), then
     // seed 2 plays on in W2-2, so that bye slot is used up.
     await service.recordResult({ tournamentId: t.id, matchId: 'W1-4', winner: ids[2], expectedEvents: 1 });
     await service.recordResult({ tournamentId: t.id, matchId: 'W2-2', winner: ids[1], expectedEvents: 2 });
     const later = await service.createPlayer({ name: 'Later Lou' });
     await expect(service.addEntrant({ tournamentId: t.id, playerId: later.id })).rejects.toThrow(/Too late/);
-  });
-
-  it('texts players at start, skips missing and opted-out numbers, never double-sends', async () => {
-    const { service, sent } = setup(true);
-    const { t } = await tournamentWith(service, ['A', 'B', 'C', 'D'], ['303-555-0101', null, '303-555-0103', '303-555-0104']);
-    await service.handleInboundSms('+13035550104', 'STOP');
-    const { sms } = await service.startTournament({ tournamentId: t.id });
-    expect(sms).toMatchObject({ sent: 2, skipped: 2, failed: 0 });
-    expect(sent.map((s) => s.to).sort()).toEqual(['+13035550101', '+13035550103']);
-    expect(sent[0].body).toMatch(/^🎱 BUDDIES Thursday Pool has started!.*https:\/\/buddies\.example\/p\/[\w-]{20,}.*Reply STOP/);
-    const again = await service.sendStartTexts({ tournamentId: t.id });
-    expect(again.sent).toBe(0);
-    expect(sent).toHaveLength(2);
-  });
-
-  it('sends "up next" texts once per match when enabled', async () => {
-    const { service, sent } = setup(true);
-    const { t, ids } = await tournamentWith(service, ['A', 'B', 'C', 'D'], ['303-555-0101', '303-555-0102', '303-555-0103', '303-555-0104']);
-    await service.updateTournament({ id: t.id, settings: { upNextTexts: true } });
-    await service.startTournament({ tournamentId: t.id, sendTexts: false });
-    // W1-1 is on the table and W1-2 is next: all four players get one text.
-    expect(sent.map((s) => s.body).every((b) => /up next/.test(b))).toBe(true);
-    expect(sent).toHaveLength(4);
-    await service.recordResult({ tournamentId: t.id, matchId: 'W1-1', winner: ids[0], expectedEvents: 0 });
-    expect(sent).toHaveLength(4); // L1/W2 not ready yet; nobody new is up
   });
 
   it('demo seed produces sensible stats', async () => {

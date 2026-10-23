@@ -10,7 +10,7 @@ import { History } from './pages/History';
 import { Home } from './pages/Home';
 import { Leaderboard } from './pages/Leaderboard';
 import { NotFound } from './pages/NotFound';
-import { PlayerLinkPage, PlayerPage } from './pages/PlayerView';
+import { PlayerPage } from './pages/PlayerView';
 import { PlayerProfile } from './pages/PlayerProfile';
 import { TournamentPage } from './pages/TournamentPage';
 import { TvPage } from './pages/TvPage';
@@ -27,7 +27,6 @@ export function App() {
               <Route path="t/:id" element={<TournamentPage />} />
               <Route path="t/:id/find" element={<FindName />} />
               <Route path="t/:id/p/:playerId" element={<PlayerPage />} />
-              <Route path="p/:token" element={<PlayerLinkPage />} />
               <Route path="leaderboard" element={<Leaderboard />} />
               <Route path="history" element={<History />} />
               <Route path="players/:id" element={<PlayerProfile />} />

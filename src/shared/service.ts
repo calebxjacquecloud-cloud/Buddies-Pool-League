@@ -10,35 +10,22 @@ import {
   type EngineEvent,
   type EngineInput,
 } from '../engine';
-import { playerLink, startMessage, upNextMessage } from './messages';
 import {
   DEFAULT_SETTINGS,
   type Entrant,
-  type EntrantToken,
-  type HostPlayer,
   type MatchRow,
   type Player,
   type Season,
-  type SmsLog,
   type Tournament,
   type TournamentBundle,
   type TournamentSettings,
 } from './model';
 import { cleanName, nameKey } from './names';
-import { smsKeyword, toE164 } from './phone';
-import type { Notifier, Store } from './store';
-import { AppError, defaultTournamentName, randomToken, shuffle, todayAtBar, uuid } from './util';
+import type { Store } from './store';
+import { AppError, defaultTournamentName, shuffle, todayAtBar, uuid } from './util';
 
 export interface ServiceOptions {
-  siteUrl: string;
   now?: () => Date;
-}
-
-export interface SmsSummary {
-  sent: number;
-  failed: number;
-  skipped: number;
-  configured: boolean;
 }
 
 /**
@@ -48,8 +35,7 @@ export interface SmsSummary {
 export class Service {
   constructor(
     private readonly store: Store,
-    private readonly notifier: Notifier,
-    private readonly opts: ServiceOptions,
+    private readonly opts: ServiceOptions = {},
   ) {}
 
   private now() {
@@ -58,15 +44,11 @@ export class Service {
 
   // ---------------------------------------------------------------- players
 
-  async hostPlayers(): Promise<HostPlayer[]> {
-    const [players, priv] = await Promise.all([this.store.listPlayers(), this.store.listPrivate()]);
-    const byId = new Map(priv.map((p) => [p.player_id, p]));
-    return players
-      .map((p) => ({ ...p, phone: byId.get(p.id)?.phone ?? null, opted_out: byId.get(p.id)?.opted_out ?? false }))
-      .sort((a, b) => a.display_name.localeCompare(b.display_name));
+  async hostPlayers(): Promise<Player[]> {
+    return (await this.store.listPlayers()).sort((a, b) => a.display_name.localeCompare(b.display_name));
   }
 
-  async createPlayer(input: { name: string; phone?: string | null }): Promise<Player> {
+  async createPlayer(input: { name: string }): Promise<Player> {
     const display_name = cleanName(input.name ?? '');
     if (!display_name) throw new AppError('Enter a name');
     if (display_name.length > 40) throw new AppError('Name is too long (40 characters max)');
@@ -74,14 +56,12 @@ export class Service {
     if (!key) throw new AppError('Name needs at least one letter or number');
     const existing = (await this.store.listPlayers()).find((p) => p.name_key === key);
     if (existing) throw new AppError(`"${existing.display_name}" is already a player. Pick them from the list instead.`, 409, 'DUPLICATE');
-    const phone = this.parsePhone(input.phone);
     const player: Player = { id: uuid(), display_name, name_key: key, created_at: this.now() };
     await this.store.insertPlayer(player);
-    if (phone) await this.store.upsertPrivate({ player_id: player.id, phone, opted_out: false, updated_at: this.now() });
     return player;
   }
 
-  async updatePlayer(input: { id: string; name?: string; phone?: string | null }) {
+  async updatePlayer(input: { id: string; name?: string }) {
     const player = await this.store.getPlayer(input.id);
     if (!player) throw new AppError('Player not found', 404);
     if (input.name !== undefined) {
@@ -93,20 +73,6 @@ export class Service {
       if (clash) throw new AppError(`"${clash.display_name}" already exists`, 409, 'DUPLICATE');
       await this.store.updatePlayer(player.id, { display_name, name_key: key });
     }
-    if (input.phone !== undefined) {
-      const phone = this.parsePhone(input.phone);
-      const [current] = await this.store.listPrivate([player.id]);
-      // Keep an existing opt-out if the number is unchanged.
-      const opted_out = current && current.phone === phone ? current.opted_out : false;
-      await this.store.upsertPrivate({ player_id: player.id, phone, opted_out, updated_at: this.now() });
-    }
-  }
-
-  private parsePhone(raw: string | null | undefined): string | null {
-    if (raw === null || raw === undefined || raw.trim() === '') return null;
-    const e164 = toE164(raw);
-    if (!e164) throw new AppError('Enter a valid US phone number, like (303) 555-1234');
-    return e164;
   }
 
   // ------------------------------------------------------------ tournaments
@@ -183,7 +149,6 @@ export class Service {
       created_at: this.now(),
     });
     if (t.status === 'live') {
-      await this.store.insertTokens([{ token: randomToken(), tournament_id: t.id, player_id: player.id }]);
       await this.sync(t.id);
     } else {
       await this.touch(t.id);
@@ -217,65 +182,17 @@ export class Service {
     );
   }
 
-  async startTournament(input: { tournamentId: string; sendTexts?: boolean }): Promise<{ sms: SmsSummary }> {
+  async startTournament(input: { tournamentId: string }) {
     const t = await this.mustGetTournament(input.tournamentId);
     if (t.status !== 'draft') throw new AppError('Already started');
-    let entrants = (await this.store.listEntrants(t.id)).sort((a, b) => a.seed - b.seed);
+    const entrants = await this.store.listEntrants(t.id);
     if (entrants.length < MIN_PLAYERS) throw new AppError(`Need at least ${MIN_PLAYERS} players to start`);
     if (t.settings.randomSeeding) {
       const order = shuffle(entrants.map((e) => e.player_id));
       await Promise.all(order.map((id, i) => this.store.updateEntrant(t.id, id, { seed: i + 1 })));
-      entrants = order.map((id, i) => ({ ...entrants.find((e) => e.player_id === id)!, seed: i + 1 }));
     }
-    const existing = new Set((await this.store.listTokens(t.id)).map((x) => x.player_id));
-    await this.store.insertTokens(
-      entrants.filter((e) => !existing.has(e.player_id)).map((e) => ({ token: randomToken(), tournament_id: t.id, player_id: e.player_id })),
-    );
     await this.store.updateTournament(t.id, { status: 'live', started_at: this.now() });
     await this.sync(t.id);
-    const sms = input.sendTexts === false ? emptySummary(this.notifier) : await this.sendStartTexts({ tournamentId: t.id });
-    return { sms };
-  }
-
-  /** Sends the "tournament has started" text to everyone who hasn't had it yet. */
-  async sendStartTexts(input: { tournamentId: string }): Promise<SmsSummary> {
-    const t = await this.mustGetTournament(input.tournamentId);
-    const summary = emptySummary(this.notifier);
-    if (!this.notifier.configured) return summary;
-    const [entrants, tokens, priv] = await Promise.all([
-      this.store.listEntrants(t.id),
-      this.store.listTokens(t.id),
-      this.store.listPrivate(),
-    ]);
-    const privBy = new Map(priv.map((p) => [p.player_id, p]));
-    const tokenBy = new Map(tokens.map((x) => [x.player_id, x.token]));
-    const jobs = entrants.map((e) => async () => {
-      const p = privBy.get(e.player_id);
-      const token = tokenBy.get(e.player_id);
-      if (!p?.phone || p.opted_out || !token) {
-        summary.skipped++;
-        return;
-      }
-      const ok = await this.sendOnce(
-        { tournament_id: t.id, player_id: e.player_id, kind: 'start', match_id: '', phone: p.phone },
-        startMessage(playerLink(this.opts.siteUrl, token)),
-      );
-      if (ok === null) summary.skipped++;
-      else if (ok) summary.sent++;
-      else summary.failed++;
-    });
-    await runLimited(jobs, 8);
-    return summary;
-  }
-
-  /** Sends a text at most once per (tournament, player, kind, match). null = already sent. */
-  private async sendOnce(key: Omit<SmsLog, 'status' | 'error' | 'created_at'>, body: string): Promise<boolean | null> {
-    const claimed = await this.store.claimSms({ ...key, status: 'skipped', error: 'sending', created_at: this.now() });
-    if (!claimed) return null;
-    const res = await this.notifier.send(key.phone, body);
-    // A failed row can be claimed again later, so the host can retry.
-    await this.store.updateSms({ ...key, status: res.ok ? 'sent' : 'failed', error: res.ok ? null : res.error ?? 'Failed' });
-    return res.ok;
   }
 
   // ---------------------------------------------------------------- results
@@ -343,7 +260,7 @@ export class Service {
 
   /**
    * Recomputes the bracket and saves derived data: finished matches (for stats),
-   * final placements, status/champion, and "up next" texts.
+   * final placements and status/champion.
    */
   async sync(tournamentId: string): Promise<BracketState> {
     const t = await this.mustGetTournament(tournamentId);
@@ -379,62 +296,7 @@ export class Service {
       completed_at: state.complete ? t.completed_at ?? this.now() : null,
       updated_at: this.now(),
     });
-
-    if (status === 'live' && t.settings.upNextTexts && this.notifier.configured) {
-      await this.sendUpNextTexts(t, state);
-    }
     return state;
-  }
-
-  private async sendUpNextTexts(t: Tournament, state: BracketState) {
-    const ids = [...state.onTable, ...state.upNext.slice(0, 1)];
-    if (!ids.length) return;
-    const [players, priv, tokens] = await Promise.all([
-      this.store.listPlayers(),
-      this.store.listPrivate(),
-      this.store.listTokens(t.id),
-    ]);
-    const name = new Map(players.map((p) => [p.id, p.display_name]));
-    const privBy = new Map(priv.map((p) => [p.player_id, p]));
-    const tokenBy = new Map(tokens.map((x) => [x.player_id, x.token]));
-    const jobs: (() => Promise<unknown>)[] = [];
-    for (const id of ids) {
-      const m = state.matches[id];
-      const [a, b] = m.players as string[];
-      for (const [me, opp] of [[a, b], [b, a]]) {
-        const p = privBy.get(me);
-        const token = tokenBy.get(me);
-        if (!p?.phone || p.opted_out || !token) continue;
-        jobs.push(() =>
-          this.sendOnce(
-            { tournament_id: t.id, player_id: me, kind: 'up_next', match_id: id, phone: p.phone! },
-            upNextMessage(name.get(opp) ?? 'your opponent', m.table, playerLink(this.opts.siteUrl, token)),
-          ),
-        );
-      }
-    }
-    await runLimited(jobs, 8);
-  }
-
-  // ------------------------------------------------------------- host extras
-
-  /** Private per-tournament info for the host: personal links, phones, text log. */
-  async hostTournamentExtras(input: { tournamentId: string }) {
-    const t = await this.mustGetTournament(input.tournamentId);
-    const [tokens, priv, sms] = await Promise.all([
-      this.store.listTokens(t.id),
-      this.store.listPrivate(),
-      this.store.listSms(t.id),
-    ]);
-    const entrants = new Set((await this.store.listEntrants(t.id)).map((e) => e.player_id));
-    return {
-      links: Object.fromEntries(tokens.map((x) => [x.player_id, playerLink(this.opts.siteUrl, x.token)])),
-      phones: Object.fromEntries(
-        priv.filter((p) => entrants.has(p.player_id)).map((p) => [p.player_id, { phone: p.phone, opted_out: p.opted_out }]),
-      ),
-      sms,
-      smsConfigured: this.notifier.configured,
-    };
   }
 
   // ----------------------------------------------------------------- seasons
@@ -455,19 +317,6 @@ export class Service {
     await this.store.deleteSeason(input.id);
   }
 
-  // ------------------------------------------------------------------ public
-
-  async resolvePlayerLink(token: string) {
-    const row = await this.store.getToken(token);
-    return row ? { tournamentId: row.tournament_id, playerId: row.player_id } : null;
-  }
-
-  async handleInboundSms(from: string, body: string) {
-    const kw = smsKeyword(body);
-    if (!kw) return { changed: 0, keyword: null };
-    const changed = await this.store.setOptOutByPhone(from, kw === 'stop');
-    return { changed, keyword: kw };
-  }
 }
 
 function sanitizeSettings(s: TournamentSettings): TournamentSettings {
@@ -475,13 +324,8 @@ function sanitizeSettings(s: TournamentSettings): TournamentSettings {
   return {
     tables: Number.isFinite(tables) ? Math.min(16, Math.max(1, tables)) : 1,
     grandFinalReset: !!s.grandFinalReset,
-    upNextTexts: !!s.upNextTexts,
     randomSeeding: !!s.randomSeeding,
   };
-}
-
-function emptySummary(n: Notifier): SmsSummary {
-  return { sent: 0, failed: 0, skipped: 0, configured: n.configured };
 }
 
 function wrap<T>(fn: () => T): T {
@@ -490,14 +334,6 @@ function wrap<T>(fn: () => T): T {
   } catch (e) {
     throw new AppError(e instanceof Error ? e.message : String(e));
   }
-}
-
-async function runLimited(jobs: (() => Promise<unknown>)[], limit: number) {
-  let i = 0;
-  const workers = Array.from({ length: Math.min(limit, jobs.length) }, async () => {
-    while (i < jobs.length) await jobs[i++]();
-  });
-  await Promise.all(workers);
 }
 
 /** Public, read-only bundle for one tournament. */
@@ -530,13 +366,11 @@ export const HOST_ACTIONS = [
   'removeEntrant',
   'setSeeds',
   'startTournament',
-  'sendStartTexts',
   'recordResult',
   'withdraw',
   'undo',
   'previewCorrection',
   'correctResult',
-  'hostTournamentExtras',
   'saveSeason',
   'deleteSeason',
 ] as const;
@@ -547,5 +381,3 @@ export async function dispatch(service: Service, action: string, payload: unknow
   const fn = (service as unknown as Record<string, (p: unknown) => Promise<unknown>>)[action];
   return fn.call(service, payload ?? {});
 }
-
-export type { EntrantToken };

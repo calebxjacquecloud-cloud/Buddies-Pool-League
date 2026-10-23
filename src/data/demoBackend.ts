@@ -1,6 +1,5 @@
 import { MemoryStore, emptyData, type MemoryData } from '../shared/memoryStore';
 import { Service, dispatch, loadBundle, type HostAction } from '../shared/service';
-import { disabledNotifier } from '../shared/store';
 import { seedDemoData } from '../shared/seed';
 import { AppError, todayAtBar } from '../shared/util';
 import { ApiError, session, StatusHub, type Backend } from './backend';
@@ -33,7 +32,7 @@ export class DemoBackend implements Backend {
 
   constructor() {
     this.store = new MemoryStore(load(), () => this.scheduleSave());
-    this.service = new Service(this.store, disabledNotifier, { siteUrl: location.origin });
+    this.service = new Service(this.store);
     try {
       this.channel = new BroadcastChannel(KEY);
       this.channel.onmessage = () => this.reload();
@@ -79,9 +78,6 @@ export class DemoBackend implements Backend {
   }
   listSeasons() {
     return this.store.listSeasons();
-  }
-  resolvePlayerLink(token: string) {
-    return this.service.resolvePlayerLink(token);
   }
   subscribe(_scope: string, onChange: () => void) {
     this.listeners.add(onChange);
