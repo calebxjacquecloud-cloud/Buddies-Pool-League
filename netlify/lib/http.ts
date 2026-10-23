@@ -12,7 +12,9 @@ export function json(body: unknown, status = 200, headers: Record<string, string
 export function errorResponse(e: unknown) {
   if (e instanceof AppError) return json({ error: e.message, code: e.code }, e.status);
   console.error(e);
-  return json({ error: 'Something went wrong on the server. Please try again.' }, 500);
+  // Show the real reason so problems can be diagnosed from the screen.
+  const detail = e instanceof Error ? e.message : String(e);
+  return json({ error: `Server error: ${detail}. Open /.netlify/functions/health to check the setup.` }, 500);
 }
 
 export function makeService() {

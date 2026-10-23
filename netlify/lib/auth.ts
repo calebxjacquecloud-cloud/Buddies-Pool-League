@@ -1,4 +1,5 @@
 import { createHash, createHmac, timingSafeEqual } from 'node:crypto';
+import { hostPin, serviceKey } from './env';
 
 /** Host sessions last one night. */
 export const SESSION_HOURS = 12;
@@ -8,8 +9,8 @@ export const SESSION_HOURS = 12;
  * HOST_PIN in Netlify instantly signs every iPad out.
  */
 function key(): Buffer {
-  const pin = process.env.HOST_PIN;
-  const secret = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  const pin = hostPin();
+  const secret = serviceKey();
   if (!pin || !secret) throw new Error('HOST_PIN and SUPABASE_SERVICE_ROLE_KEY must be set');
   return createHash('sha256').update(`buddies-host:${pin}:${secret}`).digest();
 }
@@ -17,8 +18,8 @@ function key(): Buffer {
 const b64 = (b: Buffer) => b.toString('base64url');
 
 export function pinMatches(attempt: string): boolean {
-  const pin = process.env.HOST_PIN ?? '';
-  const a = createHash('sha256').update(String(attempt)).digest();
+  const pin = hostPin();
+  const a = createHash('sha256').update(String(attempt).trim()).digest();
   const b = createHash('sha256').update(pin).digest();
   return pin.length > 0 && timingSafeEqual(a, b);
 }

@@ -1,5 +1,6 @@
 import type { Context } from '@netlify/functions';
 import { issueToken, pinMatches } from '../lib/auth';
+import { hostPin } from '../lib/env';
 import { clientIp, errorResponse, json } from '../lib/http';
 import { SupabaseStore } from '../lib/supabaseStore';
 
@@ -10,7 +11,7 @@ const MAX_FAILURES = 8;
 export default async (req: Request, context: Context) => {
   if (req.method !== 'POST') return json({ error: 'Method not allowed' }, 405);
   try {
-    if (!process.env.HOST_PIN) return json({ error: 'HOST_PIN is not set in Netlify environment variables' }, 500);
+    if (!hostPin()) return json({ error: 'HOST_PIN is not set in Netlify environment variables' }, 500);
     const ip = clientIp(req, context);
     const { db } = SupabaseStore.fromEnv();
     const since = new Date(Date.now() - WINDOW_MINUTES * 60_000).toISOString();

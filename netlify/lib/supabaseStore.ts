@@ -3,15 +3,14 @@ import type { EngineEvent } from '../../src/engine';
 import type { Entrant, MatchRow, Player, Season, Tournament } from '../../src/shared/model';
 import type { Store } from '../../src/shared/store';
 import { AppError } from '../../src/shared/util';
+import { serverSupabaseConfig } from './env';
 
 /** Store implementation for Netlify Functions, using the secret service-role key. */
 export class SupabaseStore implements Store {
   constructor(readonly db: SupabaseClient) {}
 
   static fromEnv(): SupabaseStore {
-    const url = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
-    const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-    if (!url || !key) throw new AppError('Server is missing SUPABASE_URL or SUPABASE_SERVICE_ROLE_KEY', 500);
+    const { url, key } = serverSupabaseConfig();
     return new SupabaseStore(createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } }));
   }
 
