@@ -31,7 +31,7 @@ export function HostHome() {
           <p className="text-muted mt-1">Practice 6:30pm · Tournament 7:00pm</p>
         </div>
         <div className="flex flex-col sm:flex-row gap-3 sm:items-end">
-          <label className="block">
+          <label className="block min-w-0">
             <span className="label">Date</span>
             <input type="date" className="field" value={date} onChange={(e) => setDate(e.target.value)} />
           </label>
