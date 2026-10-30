@@ -69,6 +69,28 @@ describe('service', () => {
     expect((await store.listEntrants(t.id)).every((e) => e.final_place === null)).toBe(true);
   });
 
+  it('can go back to registration after starting, erasing results', async () => {
+    const { service, store } = setup();
+    const { t, ids } = await tournamentWith(service, ['A', 'B', 'C', 'D']);
+    await service.startTournament({ tournamentId: t.id });
+    await service.recordResult({ tournamentId: t.id, matchId: 'W1-1', winner: ids[0], expectedEvents: 0 });
+    await expect(service.reopenRegistration({ tournamentId: t.id, expectedEvents: 0 })).rejects.toThrow(/another device/);
+    await service.reopenRegistration({ tournamentId: t.id, expectedEvents: 1 });
+    const back = (await store.getTournament(t.id))!;
+    expect(back.status).toBe('draft');
+    expect(back.started_at).toBeNull();
+    expect(await store.listEvents(t.id)).toEqual([]);
+    expect(await store.listMatches(t.id)).toEqual([]);
+    expect(await store.listEntrants(t.id)).toHaveLength(4);
+    // Settings can change again, and it can be restarted.
+    await service.updateTournament({ id: t.id, settings: { randomSeeding: false } });
+    await service.setSeeds({ tournamentId: t.id, playerIds: [...ids].reverse() });
+    await service.startTournament({ tournamentId: t.id });
+    const state = await service.sync(t.id);
+    expect(state.matches['W1-1'].players).toEqual([ids[3], ids[0]]);
+    await expect(service.reopenRegistration({ tournamentId: 'nope', expectedEvents: 0 })).rejects.toThrow(/not found/);
+  });
+
   it('rejects stale writes from a second device', async () => {
     const { service } = setup();
     const { t, ids } = await tournamentWith(service, ['A', 'B', 'C', 'D']);

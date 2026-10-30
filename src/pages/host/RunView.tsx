@@ -433,6 +433,40 @@ function SettingsModal({ open, onClose, t, refresh }: { open: boolean; onClose: 
           checked={tour.settings.grandFinalReset}
           onChange={(v) => !gf1Done && set({ grandFinalReset: v })}
         />
+        {tour.status === 'live' && (
+          <div className="pt-4 border-t border-line space-y-2">
+            <button
+              className="btn-secondary w-full"
+              onClick={async () => {
+                const events = t.bundle.events;
+                const results = events.filter((e) => e.type === 'result').length;
+                const withdrawals = events.length - results;
+                const lost = [results && `${results} recorded result${results === 1 ? '' : 's'}`, withdrawals && `${withdrawals} withdrawal${withdrawals === 1 ? '' : 's'}`]
+                  .filter(Boolean)
+                  .join(' and ');
+                const ok = await confirm({
+                  title: 'Undo start and go back to registration?',
+                  body: (
+                    <>
+                      <p>Everyone stays signed up. You can change the random draw, reorder or add/remove players, then tap Start again.</p>
+                      {lost ? <p className="text-gold font-bold">This erases {lost}.</p> : <p>No results have been recorded yet, so nothing is lost.</p>}
+                    </>
+                  ),
+                  confirm: 'Back to registration',
+                  tone: lost ? 'danger' : 'primary',
+                });
+                if (!ok) return;
+                if ((await run('reopenRegistration', { tournamentId: tour.id, expectedEvents: events.length }, { onStale: () => void refresh() })) !== undefined) {
+                  onClose();
+                  await refresh();
+                }
+              }}
+            >
+              ↩︎ Undo start (back to registration)
+            </button>
+            <p className="text-xs text-muted">Change the draw or the player list, then start again.</p>
+          </div>
+        )}
         <div className="pt-4 border-t border-line">
           <button
             className="btn-ghost text-danger w-full"

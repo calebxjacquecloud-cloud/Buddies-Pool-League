@@ -195,6 +195,31 @@ export class Service {
     await this.sync(t.id);
   }
 
+  /**
+   * Undo "Start": back to registration with the same players, so the host can
+   * change seeding settings or the player list and start again. Any recorded
+   * results and withdrawals are erased.
+   */
+  async reopenRegistration(input: { tournamentId: string; expectedEvents: number }) {
+    const t = await this.mustGetTournament(input.tournamentId);
+    if (t.status !== 'live') throw new AppError(t.status === 'draft' ? 'Registration is already open' : 'This tournament is finished');
+    const events = await this.store.listEvents(t.id);
+    if (events.length !== input.expectedEvents) {
+      throw new AppError('The bracket changed on another device. It has been refreshed.', 409, 'STALE');
+    }
+    if (events.length) await this.store.writeEvents(t.id, events.length, 0, []);
+    await this.store.replaceMatches(t.id, []);
+    const entrants = await this.store.listEntrants(t.id);
+    await Promise.all(entrants.map((e) => (e.final_place !== null ? this.store.updateEntrant(t.id, e.player_id, { final_place: null }) : null)));
+    await this.store.updateTournament(t.id, {
+      status: 'draft',
+      started_at: null,
+      completed_at: null,
+      champion_id: null,
+      updated_at: this.now(),
+    });
+  }
+
   // ---------------------------------------------------------------- results
 
   private async engineInput(t: Tournament, entrants?: Entrant[]): Promise<EngineInput> {
@@ -366,6 +391,7 @@ export const HOST_ACTIONS = [
   'removeEntrant',
   'setSeeds',
   'startTournament',
+  'reopenRegistration',
   'recordResult',
   'withdraw',
   'undo',
