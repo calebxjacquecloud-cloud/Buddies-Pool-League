@@ -13,7 +13,7 @@ import { NotFound } from './pages/NotFound';
 import { PlayerPage } from './pages/PlayerView';
 import { PlayerProfile } from './pages/PlayerProfile';
 import { TournamentPage } from './pages/TournamentPage';
-import { TvPage } from './pages/TvPage';
+import { TvCurrent, TvPage } from './pages/TvPage';
 
 export function App() {
   return (
@@ -21,6 +21,7 @@ export function App() {
       <ToastProvider>
         <ConfirmProvider>
           <Routes>
+            <Route path="/tv" element={<TvCurrent />} />
             <Route path="/tv/:id" element={<TvPage />} />
             <Route element={<Layout />}>
               <Route index element={<Home />} />

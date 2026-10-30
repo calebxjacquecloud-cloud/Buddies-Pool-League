@@ -56,10 +56,14 @@ export function HostHome() {
         )}
       </section>
 
-      <section className="grid gap-4 md:grid-cols-3">
+      <section className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
         <Link to="/host/players" className="card p-5 active:scale-[0.99] transition">
           <div className="text-lg font-black">👥 Players</div>
           <div className="text-muted text-sm">Fix names, see everyone's stats</div>
+        </Link>
+        <Link to="/tv" className="card p-5 active:scale-[0.99] transition">
+          <div className="text-lg font-black">📺 TV screen</div>
+          <div className="text-muted text-sm">Always shows the current tournament. Bookmark /tv on the TV's browser.</div>
         </Link>
         <SeasonsCard />
         <div className="card p-5 flex flex-col gap-3">

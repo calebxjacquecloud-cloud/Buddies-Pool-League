@@ -112,7 +112,7 @@ To remove the demo data later, delete those tournaments from the host dashboard 
 
 **Show the bracket on the TV (two ways):**
 - **AirPlay mirroring:** on the iPad, open Control Center → **Screen Mirroring** → pick the Apple TV / AirPlay TV. Then tap **📺 TV Mode** in the app. To get back, tap the screen and press **Exit TV**.
-- **Directly on a smart TV or a second device** (so the iPad stays free): open the TV's web browser and go to `https://YOUR-SITE.netlify.app/tv/<tournament id>`. The easiest way to get that address: on the iPad, open the tournament's public page (Live → Bracket → **📺 TV view**) and copy the URL. TV mode is read-only and updates by itself.
+- **Directly on a smart TV or a second device** (so the iPad stays free): open the TV's web browser and go to `https://YOUR-SITE.netlify.app/tv`, then bookmark it. That address always shows the current tournament and switches by itself each week. Chromecast/Google TV: open it in Chrome on a laptop, then ⋮ → Cast. Tapping **📺 TV Mode** on the iPad shows these steps too.
 
 TV mode shows a **QR code**; players scan it with their phone camera, tap their name, and get their own page: status, next opponent, matches until they're up, and stats. It updates by itself, so they can leave it open all night.
 

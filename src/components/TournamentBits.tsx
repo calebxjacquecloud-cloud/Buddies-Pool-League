@@ -18,15 +18,15 @@ export function placements(state: BracketState) {
 export function ChampionCard({ state, name, tv }: { state: BracketState; name: (id: string | null | undefined) => string; tv?: boolean }) {
   const places = placements(state);
   return (
-    <div className={`card text-center ${tv ? 'p-10' : 'p-8'} border-gold/60 bg-gradient-to-b from-gold/15 to-surface`}>
+    <div className={`card text-center ${tv ? 'p-10' : 'p-5 sm:p-8'} border-gold/60 bg-gradient-to-b from-gold/15 to-surface`}>
       <div className={tv ? 'text-8xl' : 'text-6xl'}>🏆</div>
       <div className={`uppercase tracking-[0.3em] font-black text-gold mt-2 ${tv ? 'text-2xl' : 'text-sm'}`}>Champion</div>
       <div className={`font-black mt-1 break-words ${tv ? 'text-8xl' : 'text-5xl'}`}>{name(state.champion)}</div>
-      <div className={`mt-8 grid gap-2 mx-auto max-w-md text-left ${tv ? 'text-3xl max-w-2xl' : 'text-lg'}`}>
+      <div className={`mt-8 grid grid-cols-1 gap-2 mx-auto max-w-md text-left ${tv ? 'text-3xl max-w-2xl' : 'text-lg'}`}>
         {places.slice(1, tv ? 4 : 8).map((p) => (
-          <div key={p.id} className="flex justify-between gap-4 rounded-xl bg-surface-2 px-4 py-2">
-            <span className="font-black text-muted w-16">{ordinal(p.place!)}</span>
-            <span className="flex-1 font-bold truncate">{name(p.id)}</span>
+          <div key={p.id} className="flex justify-between gap-3 rounded-xl bg-surface-2 px-3 sm:px-4 py-2">
+            <span className="font-black text-muted w-12 shrink-0">{ordinal(p.place!)}</span>
+            <span className="flex-1 min-w-0 font-bold truncate">{name(p.id)}</span>
             <span className="text-muted tabular-nums">
               {p.wins}-{p.playedLosses}
             </span>

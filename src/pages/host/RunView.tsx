@@ -12,6 +12,7 @@ import type { TournamentSettings } from '../../shared/model';
 import { formatDate } from '../../shared/util';
 import type { useHostData } from './HostTournament';
 import { PlayerPicker } from './PlayerPicker';
+import { TvHelpModal } from './TvHelpModal';
 
 type HostData = ReturnType<typeof useHostData>;
 type Tab = 'matches' | 'bracket' | 'players';
@@ -27,6 +28,7 @@ export function RunView({ t, host, refresh }: { t: LiveTournament; host: HostDat
   const [tab, setTab] = useState<Tab>('matches');
   const [matchOpen, setMatchOpen] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [tvOpen, setTvOpen] = useState(false);
   const { run, busy } = useHostAction();
   const toast = useToast();
   const confirm = useConfirm();
@@ -93,7 +95,7 @@ export function RunView({ t, host, refresh }: { t: LiveTournament; host: HostDat
           <button className="btn-secondary" onClick={() => setSettingsOpen(true)}>
             ⚙︎ Settings
           </button>
-          <button className="btn-gold" onClick={goTv}>
+          <button className="btn-gold" onClick={() => setTvOpen(true)}>
             📺 TV Mode
           </button>
         </div>
@@ -132,6 +134,7 @@ export function RunView({ t, host, refresh }: { t: LiveTournament; host: HostDat
         }}
         refresh={refresh}
       />
+      <TvHelpModal open={tvOpen} onClose={() => setTvOpen(false)} onStart={goTv} />
       <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} t={t} refresh={refresh} />
     </div>
   );
@@ -158,7 +161,7 @@ function MatchesTab({
     <div className="space-y-6">
       <section>
         <h2 className="text-sm font-black uppercase tracking-widest text-felt mb-2">On the table now</h2>
-        <div className="grid gap-4 lg:grid-cols-2">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           {state.onTable.map((id) => (
             <PlayCard key={id} m={state.matches[id]} state={state} name={name} onRecord={onRecord} busy={busy} big />
           ))}
@@ -206,27 +209,27 @@ function PlayCard({
     const ps = state.players[p];
     return (
       <button
-        className={`flex-1 rounded-2xl border-2 border-line bg-surface-2 active:bg-felt active:text-black active:border-felt transition px-4 ${
-          big ? 'min-h-28 text-2xl md:text-3xl' : 'min-h-20 text-xl'
+        className={`flex-1 min-w-0 rounded-2xl border-2 border-line bg-surface-2 active:bg-felt active:text-black active:border-felt transition px-2 sm:px-4 ${
+          big ? 'min-h-28 text-xl sm:text-2xl md:text-3xl' : 'min-h-20 text-lg sm:text-xl'
         } font-black flex flex-col items-center justify-center gap-1 disabled:opacity-50`}
         disabled={busy}
         onClick={() => onRecord(m.id, p)}
         aria-label={`${name(p)} wins`}
       >
-        <span className="text-center leading-tight break-words">{name(p)}</span>
+        <span className="max-w-full text-center leading-tight [overflow-wrap:anywhere]">{name(p)}</span>
         <span className="text-xs font-bold text-muted">{ps.losses === 0 ? 'Undefeated' : '1 loss'}</span>
       </button>
     );
   };
   return (
     <div className="card p-4 border-felt/60">
-      <div className="flex items-center justify-between mb-3">
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
         <span className="chip bg-felt text-black text-sm">Table {m.table}</span>
         <span className="text-sm font-bold text-muted">
           {roundLabel(m.def, state.structure)} · {matchLabel(m.id)}
         </span>
       </div>
-      <div className="flex items-stretch gap-3">
+      <div className="flex items-stretch gap-2 sm:gap-3">
         {player(a)}
         <span className="self-center text-faint font-black">VS</span>
         {player(b)}

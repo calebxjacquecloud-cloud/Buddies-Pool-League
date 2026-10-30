@@ -7,16 +7,41 @@ import { QR } from '../components/QR';
 import { ChampionCard, QueueList } from '../components/TournamentBits';
 import { Badge, ConnectionPill, Spinner, Wordmark } from '../components/ui';
 import { backend } from '../data';
-import { useTournament } from '../hooks/data';
+import { useLive, useTournament } from '../hooks/data';
 import { useWakeLock } from '../hooks/wakeLock';
 import { formatDate } from '../shared/util';
 
 /**
- * Read-only TV display. Opened from the host's "TV Mode" button (iPad mirrored
- * via AirPlay) or directly at /tv/:id on a smart TV browser. No edit controls.
+ * /tv: the permanent TV address. Always shows the current tournament (live
+ * first, then tonight's registration, then the latest result) and switches by
+ * itself when a new one starts, so a smart TV browser can bookmark it once.
  */
-export function TvPage() {
-  const { id } = useParams();
+export function TvCurrent() {
+  const list = useLive(() => backend.listTournaments(), '*');
+  if (list.data === undefined) return <div className="h-dvh grid place-items-center"><Spinner /></div>;
+  const pick =
+    list.data.find((t) => t.status === 'live') ?? list.data.find((t) => t.status === 'draft') ?? list.data.find((t) => t.status === 'complete');
+  if (!pick) {
+    return (
+      <div className="h-dvh w-screen grid place-items-center bg-bg text-center p-10">
+        <div className="flex flex-col items-center gap-6">
+          <Badge className="h-40 w-40" />
+          <Wordmark className="text-7xl" />
+          <p className="text-3xl text-muted">Thursday Pool · Practice 6:30pm · Tournament 7:00pm</p>
+        </div>
+      </div>
+    );
+  }
+  return <TvPage tournamentId={pick.id} />;
+}
+
+/**
+ * Read-only TV display. Opened from the host's "TV Mode" button (iPad mirrored
+ * via AirPlay) or directly at /tv or /tv/:id on a smart TV browser. No edit controls.
+ */
+export function TvPage({ tournamentId }: { tournamentId?: string }) {
+  const params = useParams();
+  const id = tournamentId ?? params.id;
   const { t } = useTournament(id);
   const navigate = useNavigate();
   const [chrome, setChrome] = useState(true);

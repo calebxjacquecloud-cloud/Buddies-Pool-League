@@ -83,7 +83,7 @@ export function Registration({ t, host, refresh }: { t: LiveTournament; host: Ho
         </button>
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <section className="card p-5 space-y-3">
           <h2 className="text-xl font-black">Add players</h2>
           <PlayerPicker players={host.players} entered={entered} onPick={add} onCreated={host.reloadPlayers} disabled={busy || n >= MAX_PLAYERS} />
