@@ -7,6 +7,7 @@ import { useHostAction } from '../../hooks/host';
 import type { Player, TournamentSettings } from '../../shared/model';
 import { formatDate, shuffle } from '../../shared/util';
 import type { useHostData } from './HostTournament';
+import { BracketPreview } from './BracketPreview';
 import { PlayerEditModal, PlayerPicker } from './PlayerPicker';
 
 type HostData = ReturnType<typeof useHostData>;
@@ -131,6 +132,19 @@ export function Registration({ t, host, refresh }: { t: LiveTournament; host: Ho
           </ol>
         </section>
       </div>
+
+      {n >= MIN_PLAYERS && (
+        <section className="card p-5 space-y-3">
+          <h2 className="text-xl font-black">Round 1 matchups</h2>
+          {tour.settings.randomSeeding ? (
+            <p className="text-muted">
+              Random draw is on, so matchups are shuffled when you tap Start. Turn <b>Random draw</b> off below to set them yourself.
+            </p>
+          ) : (
+            <BracketPreview playerIds={entrants.map((e) => e.player_id)} name={t.name} onReorder={reorder} disabled={busy} />
+          )}
+        </section>
+      )}
 
       <section className="card p-5 grid gap-x-8 md:grid-cols-2">
         <div className="flex items-center justify-between py-3">
