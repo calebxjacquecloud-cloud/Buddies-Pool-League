@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { readSupabaseConfig } from '../../src/data/config';
 import { hostPin, serverSupabaseUrl, serviceKey, serviceKeyProblem } from '../lib/env';
 
-const TABLES = ['players', 'tournaments', 'entrants', 'tournament_events', 'matches', 'seasons', 'host_login_attempts'];
+const TABLES = ['players', 'tournaments', 'entrants', 'tournament_events', 'matches', 'seasons', 'host_login_attempts', 'checkin_attempts'];
 
 interface Check {
   ok: boolean;
@@ -60,7 +60,7 @@ export async function runChecks(): Promise<Check[]> {
   add(
     missing.length === 0,
     'Database tables created',
-    `Missing or unreadable: ${missing.join(', ')}. Run supabase/migrations/20261023000000_init.sql in Supabase → SQL Editor (or check the GitHub integration's deploy log).`,
+    `Missing or unreadable: ${missing.join(', ')}. Run the files in supabase/migrations (oldest first) in Supabase → SQL Editor, or check the GitHub integration's deploy log.`,
   );
 
   const rpc = await db.rpc('write_events', { p_tournament: '00000000-0000-0000-0000-000000000000', p_expected: 0, p_from: 0, p_events: [] });

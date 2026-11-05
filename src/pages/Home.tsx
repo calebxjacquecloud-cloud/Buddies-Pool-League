@@ -51,7 +51,10 @@ export function Home() {
         <section key={t.id} className="card p-6 border-sky/60">
           <span className="chip bg-sky text-black">Registration open</span>
           <h2 className="text-2xl font-black mt-2">{t.name}</h2>
-          <p className="text-muted">Sign up with the bartender. The bracket goes live at 7:00pm.</p>
+          <p className="text-muted">Check in from your phone. The bracket goes live at 7:00pm.</p>
+          <Link to={`/t/${t.id}/checkin`} className="btn-primary btn-lg mt-3">
+            Check in
+          </Link>
         </section>
       ))}
 

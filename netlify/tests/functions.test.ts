@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { MemoryStore } from '../../src/shared/memoryStore';
 
 const store = new MemoryStore();
+const checkins = { count: 0 };
 vi.mock('../lib/supabaseStore', () => ({
   SupabaseStore: {
     fromEnv: () =>
@@ -13,7 +14,9 @@ vi.mock('../lib/supabaseStore', () => ({
         // host-login's rate limiter talks to the db directly; fake "no failures".
         db: {
           from: () => ({
-            select: () => ({ eq: () => ({ eq: () => ({ gte: async () => ({ count: 0 }) }) }) }),
+            select: () => ({
+              eq: () => ({ eq: () => ({ gte: async () => ({ count: 0 }) }), gte: async () => ({ count: checkins.count }) }),
+            }),
             insert: async () => ({}),
           }),
         },
@@ -23,6 +26,7 @@ vi.mock('../lib/supabaseStore', () => ({
 
 const { default: api } = await import('../functions/api');
 const { default: login } = await import('../functions/host-login');
+const { default: checkin } = await import('../functions/checkin');
 
 const ctx = {} as never;
 const post = (url: string, body: unknown, headers: Record<string, string> = {}) =>
@@ -79,5 +83,32 @@ describe('api', () => {
     await call('startTournament', { tournamentId: t.id });
     expect((await store.getTournament(t.id))?.status).toBe('live');
     await expect(call('recordResult', { tournamentId: t.id, matchId: 'W1-1', winner: 'nobody', expectedEvents: 0 })).rejects.toThrow(/not in/);
+  });
+});
+
+describe('checkin (public)', () => {
+  it('checks players in without a PIN, only during registration, with a rate limit', async () => {
+    const { Service } = await import('../../src/shared/service');
+    const service = new Service(store);
+    const t = await service.createTournament({ date: '2026-11-05' });
+    const send = (body: unknown) => checkin(post('https://x/.netlify/functions/checkin', body), ctx);
+
+    const res = await send({ tournamentId: t.id, name: 'Iggy' });
+    expect(res.status).toBe(200);
+    const iggy = (await res.json()) as { playerId: string; already: boolean };
+    expect(iggy.already).toBe(false);
+    expect((await send({ tournamentId: t.id, playerId: iggy.playerId })).status).toBe(200);
+    expect((await send({ tournamentId: t.id, name: 'iggy' })).status).toBe(409);
+    expect((await send({})).status).toBe(400);
+
+    checkins.count = 99;
+    expect((await send({ tournamentId: t.id, name: 'Spammer' })).status).toBe(429);
+    checkins.count = 0;
+
+    for (const n of ['Zach', 'Zev', 'Bob']) expect((await send({ tournamentId: t.id, name: n })).status).toBe(200);
+    await service.startTournament({ tournamentId: t.id });
+    const closed = await send({ tournamentId: t.id, name: 'Too Late' });
+    expect(closed.status).toBe(409);
+    expect(((await closed.json()) as { error: string }).error).toMatch(/closed/);
   });
 });

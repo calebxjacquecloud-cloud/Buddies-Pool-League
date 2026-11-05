@@ -2,7 +2,7 @@ import { createClient, type RealtimeChannel, type SupabaseClient } from '@supaba
 import type { EngineEvent } from '../engine';
 import type { HostAction } from '../shared/service';
 import type { Entrant, MatchRow, Season, StatsData, Tournament, TournamentBundle } from '../shared/model';
-import { ApiError, session, StatusHub, type Backend } from './backend';
+import { ApiError, session, StatusHub, type Backend, type CheckInResult } from './backend';
 
 /** Production backend: reads straight from Supabase, writes through Netlify Functions. */
 export class SupabaseBackend implements Backend {
@@ -67,6 +67,26 @@ export class SupabaseBackend implements Backend {
     ]);
     this.markOnline();
     return { players, tournaments, entrants, matches };
+  }
+
+  async listPlayers() {
+    return this.all<{ id: string; display_name: string }>('players', 'id, display_name');
+  }
+
+  async checkIn(input: { tournamentId: string; playerId?: string; name?: string }): Promise<CheckInResult> {
+    let res: Response;
+    try {
+      res = await fetch('/.netlify/functions/checkin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(input),
+      });
+    } catch {
+      throw new ApiError('No connection. Check the Wi-Fi and try again.', 0, 'NETWORK');
+    }
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new ApiError(body.error ?? `Error ${res.status}`, res.status, body.code);
+    return body as CheckInResult;
   }
 
   listSeasons() {

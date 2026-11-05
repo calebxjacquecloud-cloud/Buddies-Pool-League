@@ -5,6 +5,7 @@ import { HostGate } from './pages/host/HostGate';
 import { HostHome } from './pages/host/HostHome';
 import { HostPlayers } from './pages/host/HostPlayers';
 import { HostTournament } from './pages/host/HostTournament';
+import { CheckIn } from './pages/CheckIn';
 import { FindName } from './pages/FindName';
 import { History } from './pages/History';
 import { Home } from './pages/Home';
@@ -27,6 +28,7 @@ export function App() {
               <Route index element={<Home />} />
               <Route path="t/:id" element={<TournamentPage />} />
               <Route path="t/:id/find" element={<FindName />} />
+              <Route path="t/:id/checkin" element={<CheckIn />} />
               <Route path="t/:id/p/:playerId" element={<PlayerPage />} />
               <Route path="leaderboard" element={<Leaderboard />} />
               <Route path="history" element={<History />} />

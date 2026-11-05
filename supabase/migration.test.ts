@@ -54,7 +54,7 @@ describe('migration', () => {
   });
 
   it('hides private tables from the public', async () => {
-    for (const table of ['host_login_attempts']) {
+    for (const table of ['host_login_attempts', 'checkin_attempts']) {
       const res = await as('anon', `select * from ${table}`);
       expect(res === 'ERR: permission denied for table ' + table || (Array.isArray(res) && res.length === 0)).toBe(true);
     }

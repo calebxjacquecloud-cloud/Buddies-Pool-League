@@ -1,6 +1,7 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { MAX_PLAYERS, MIN_PLAYERS, nextPowerOfTwo } from '../../engine';
+import { enterFullscreen } from '../../components/fullscreen';
 import { Stepper, Toggle, useConfirm, useToast } from '../../components/ui';
 import type { LiveTournament } from '../../hooks/data';
 import { useHostAction } from '../../hooks/host';
@@ -9,6 +10,7 @@ import { formatDate, shuffle } from '../../shared/util';
 import type { useHostData } from './HostTournament';
 import { BracketPreview } from './BracketPreview';
 import { PlayerEditModal, PlayerPicker } from './PlayerPicker';
+import { TvHelpModal } from './TvHelpModal';
 
 type HostData = ReturnType<typeof useHostData>;
 
@@ -20,11 +22,23 @@ export function Registration({ t, host, refresh }: { t: LiveTournament; host: Ho
   const confirm = useConfirm();
   const navigate = useNavigate();
   const [editing, setEditing] = useState<Player | null>(null);
+  const [tvOpen, setTvOpen] = useState(false);
 
   const entrants = useMemo(() => [...bundle.entrants].sort((a, b) => a.seed - b.seed), [bundle.entrants]);
   const entered = useMemo(() => new Set(entrants.map((e) => e.player_id)), [entrants]);
   const byId = useMemo(() => new Map(host.players.map((p) => [p.id, p])), [host.players]);
   const n = entrants.length;
+
+  // Players who check in from their phones may be new to the roster.
+  const { reloadPlayers } = host;
+  useEffect(() => {
+    void reloadPlayers();
+  }, [n, reloadPlayers]);
+
+  const goTv = () => {
+    enterFullscreen();
+    navigate(`/tv/${tour.id}`);
+  };
 
   const after = async (ok: unknown) => {
     if (ok !== undefined) await refresh();
@@ -48,7 +62,7 @@ export function Registration({ t, host, refresh }: { t: LiveTournament; host: Ho
             {tour.settings.randomSeeding ? 'The draw will be random.' : 'Seeds are locked in the order shown.'} Bracket size {nextPowerOfTwo(n)}
             {nextPowerOfTwo(n) > n ? ` (${nextPowerOfTwo(n) - n} bye${nextPowerOfTwo(n) - n === 1 ? '' : 's'})` : ''}.
           </p>
-          <p>Then tap 📺 TV Mode so players can scan the QR code to find their name.</p>
+          <p>The TV switches from check-in to the bracket by itself.</p>
         </>
       ),
       confirm: '🎱 Start Tournament',
@@ -56,7 +70,7 @@ export function Registration({ t, host, refresh }: { t: LiveTournament; host: Ho
     if (!ok) return;
     if ((await run('startTournament', { tournamentId: tour.id })) === undefined) return;
     await refresh();
-    toast({ tone: 'ok', text: 'Tournament started! Put TV Mode up so players can scan the QR code.' });
+    toast({ tone: 'ok', text: 'Tournament started! The TV now shows the bracket.' });
   };
 
   return (
@@ -71,17 +85,32 @@ export function Registration({ t, host, refresh }: { t: LiveTournament; host: Ho
             {formatDate(tour.date)} · <span className="chip bg-sky text-black">Registration</span>
           </p>
         </div>
-        <button
-          className="btn-ghost btn-sm text-danger"
-          onClick={async () => {
-            if (await confirm({ title: 'Delete this tournament?', body: 'Registered players stay in the player list.', confirm: 'Delete', tone: 'danger' })) {
-              if ((await run('deleteTournament', { id: tour.id })) !== undefined) navigate('/host');
-            }
-          }}
-        >
-          Delete
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button className="btn-gold" onClick={() => setTvOpen(true)}>
+            📺 TV Mode
+          </button>
+          <button
+            className="btn-ghost text-danger"
+            onClick={async () => {
+              if (await confirm({ title: 'Delete this tournament?', body: 'Registered players stay in the player list.', confirm: 'Delete', tone: 'danger' })) {
+                if ((await run('deleteTournament', { id: tour.id })) !== undefined) navigate('/host');
+              }
+            }}
+          >
+            Delete
+          </button>
+        </div>
       </div>
+
+      <section className="card p-4 border-sky/50 flex flex-wrap items-center justify-between gap-3">
+        <p className="text-sm text-muted max-w-2xl">
+          <b className="text-ink">Players can check themselves in.</b> Put <b className="text-ink">TV Mode</b> up and they scan the QR code with their phone camera. Their
+          names appear here and on the TV automatically. You can still add or remove anyone below.
+        </p>
+        <Link to={`/t/${tour.id}/checkin`} className="btn-secondary btn-sm" target="_blank" rel="noreferrer">
+          Open check-in page
+        </Link>
+      </section>
 
       <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
         <section className="card p-5 space-y-3">
@@ -100,7 +129,7 @@ export function Registration({ t, host, refresh }: { t: LiveTournament; host: Ho
               </button>
             )}
           </div>
-          {n === 0 && <p className="text-muted">Nobody yet. Search or add players on the left.</p>}
+          {n === 0 && <p className="text-muted">Nobody yet. Players can scan the QR code on the TV, or add them here.</p>}
           <ol className="divide-y divide-line">
             {entrants.map((e, i) => {
               const p = byId.get(e.player_id);
@@ -179,6 +208,7 @@ export function Registration({ t, host, refresh }: { t: LiveTournament; host: Ho
         </div>
       </div>
 
+      <TvHelpModal open={tvOpen} onClose={() => setTvOpen(false)} onStart={goTv} />
       <PlayerEditModal
         player={editing}
         onClose={() => setEditing(null)}

@@ -155,6 +155,34 @@ export class Service {
     }
   }
 
+  /**
+   * Public self check-in from a player's phone (the TV's QR code). Allowed only
+   * while the tournament is in registration. Either picks an existing player
+   * or adds a new one by name. Checking in twice is harmless.
+   */
+  async checkIn(input: { tournamentId: string; playerId?: string; name?: string }) {
+    const t = await this.mustGetTournament(input.tournamentId);
+    if (t.status !== 'draft') throw new AppError('Check-in is closed because the tournament has started. Ask the host to add you.', 409, 'CLOSED');
+    let player: Player | null;
+    if (input.playerId) {
+      player = await this.store.getPlayer(input.playerId);
+      if (!player) throw new AppError('Player not found', 404);
+    } else {
+      const key = nameKey(cleanName(input.name ?? ''));
+      const existing = key ? (await this.store.listPlayers()).find((p) => p.name_key === key) : undefined;
+      if (existing) {
+        throw new AppError(`"${existing.display_name}" is already on the list of players. Search for your name and tap it instead.`, 409, 'DUPLICATE');
+      }
+      player = await this.createPlayer({ name: input.name ?? '' });
+    }
+    const entrants = await this.store.listEntrants(t.id);
+    if (entrants.some((e) => e.player_id === player!.id)) {
+      return { playerId: player.id, displayName: player.display_name, already: true };
+    }
+    await this.addEntrant({ tournamentId: t.id, playerId: player.id });
+    return { playerId: player.id, displayName: player.display_name, already: false };
+  }
+
   async removeEntrant(input: { tournamentId: string; playerId: string }) {
     const t = await this.mustGetTournament(input.tournamentId);
     if (t.status !== 'draft') throw new AppError('Players can only be removed before the start. Use Withdraw instead.');
@@ -176,7 +204,8 @@ export class Service {
   }
 
   private async renumber(tournamentId: string) {
-    const entrants = (await this.store.listEntrants(tournamentId)).sort((a, b) => a.seed - b.seed);
+    // Ties (two phones checking in at the same moment) keep check-in order.
+    const entrants = (await this.store.listEntrants(tournamentId)).sort((a, b) => a.seed - b.seed || a.created_at.localeCompare(b.created_at));
     await Promise.all(
       entrants.map((e, i) => (e.seed !== i + 1 ? this.store.updateEntrant(tournamentId, e.player_id, { seed: i + 1 }) : null)),
     );
@@ -190,6 +219,8 @@ export class Service {
     if (t.settings.randomSeeding) {
       const order = shuffle(entrants.map((e) => e.player_id));
       await Promise.all(order.map((id, i) => this.store.updateEntrant(t.id, id, { seed: i + 1 })));
+    } else {
+      await this.renumber(t.id);
     }
     await this.store.updateTournament(t.id, { status: 'live', started_at: this.now() });
     await this.sync(t.id);

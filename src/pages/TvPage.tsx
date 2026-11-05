@@ -93,19 +93,10 @@ export function TvPage({ tournamentId }: { tournamentId?: string }) {
       </header>
 
       {tour.status === 'draft' || !state ? (
-        <div className="flex-1 grid grid-cols-[1fr_auto] gap-10 p-10 items-center">
-          <div>
-            <h2 className="text-6xl font-black">Sign up at the bar!</h2>
-            <p className="text-3xl text-muted mt-4">Practice 6:30pm · Tournament 7:00pm · Double elimination</p>
-            <div className="mt-10 flex flex-wrap gap-3 text-3xl font-bold">
-              {[...bundle.entrants].sort((a, b) => a.created_at.localeCompare(b.created_at)).map((e) => (
-                <span key={e.player_id} className="rounded-xl bg-surface-2 border border-line px-4 py-2">{name(e.player_id)}</span>
-              ))}
-            </div>
-            <p className="text-2xl text-muted mt-6">{bundle.entrants.length} players signed up</p>
-          </div>
-          <QrPanel url={`${location.origin}/t/${tour.id}`} label="Follow the bracket" />
-        </div>
+        <CheckInBoard
+          names={[...bundle.entrants].sort((x, y) => x.created_at.localeCompare(y.created_at)).map((e) => ({ id: e.player_id, name: name(e.player_id) }))}
+          url={`${location.origin}/t/${tour.id}/checkin`}
+        />
       ) : (
         <div className="flex-1 min-h-0 grid grid-cols-[1fr_minmax(300px,24%)]">
           {state.complete ? (
@@ -152,6 +143,50 @@ export function TvPage({ tournamentId }: { tournamentId?: string }) {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+/** Registration screen: who's checked in, plus a big QR code to check in. */
+function CheckInBoard({ names, url }: { names: { id: string; name: string }[]; url: string }) {
+  const n = names.length;
+  // Name size follows the screen height and shrinks as the list grows, so
+  // everyone fits on a TV or a mirrored iPad (up to the 64-player maximum).
+  const size = n > 40 ? 'text-[1.7vh]' : n > 24 ? 'text-[2.1vh]' : n > 12 ? 'text-[2.7vh]' : 'text-[3.4vh]';
+  return (
+    <div className="flex-1 min-h-0 grid grid-cols-1 grid-rows-[1fr_auto] lg:grid-cols-[1fr_auto] lg:grid-rows-1 gap-6 lg:gap-10 p-6 lg:p-10">
+      <div className="min-h-0 flex flex-col">
+        <div className="flex items-end justify-between gap-6">
+          <h2 className="text-5xl lg:text-6xl font-black">Checked in tonight</h2>
+          <span className="text-5xl lg:text-6xl font-black text-felt tabular-nums">{n}</span>
+        </div>
+        <p className="text-xl lg:text-2xl text-muted mt-3">Practice 6:30pm · Tournament 7:00pm · Double elimination</p>
+        <div className="mt-6 lg:mt-8 min-h-0 flex-1 overflow-hidden">
+          {n === 0 ? (
+            <p className="text-4xl text-muted mt-10">Be the first: scan the code to check in →</p>
+          ) : (
+            <div className="flex flex-wrap content-start gap-[1vh] font-bold">
+              {names.map((p, i) => (
+                <span
+                  key={p.id}
+                  className={`rounded-xl border px-[0.7em] py-[0.3em] animate-pop ${size} ${i === n - 1 ? 'bg-felt/20 border-felt text-felt' : 'bg-surface-2 border-line'}`}
+                >
+                  {p.name}
+                </span>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+      <div className="lg:w-[26rem] flex flex-row lg:flex-col items-center justify-center gap-6 rounded-3xl bg-surface-2 border border-line p-6 lg:p-8 text-center">
+        <QR url={url} className="w-48 h-48 lg:w-80 lg:h-80 lg:order-2" />
+        <div className="text-3xl lg:text-4xl font-black lg:order-1">📱 Scan to check in</div>
+        <div className="text-xl lg:text-2xl text-muted leading-snug lg:order-3">
+          Played before? <b className="text-ink">Tap your name.</b>
+          <br />
+          New? <b className="text-ink">Add your name.</b>
+        </div>
+      </div>
     </div>
   );
 }

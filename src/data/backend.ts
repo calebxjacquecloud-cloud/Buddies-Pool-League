@@ -12,6 +12,10 @@ export interface Backend {
   listTournaments(): Promise<Tournament[]>;
   getStatsData(): Promise<StatsData>;
   listSeasons(): Promise<Season[]>;
+  /** Everyone on the roster (names only), for the check-in search. */
+  listPlayers(): Promise<{ id: string; display_name: string }[]>;
+  /** Public self check-in while the tournament is in registration. */
+  checkIn(input: { tournamentId: string; playerId?: string; name?: string }): Promise<CheckInResult>;
   /** Calls onChange whenever data for this tournament (or anything, with '*') changes. */
   subscribe(scope: string, onChange: () => void): () => void;
   onStatus(cb: (s: ConnectionStatus) => void): () => void;
@@ -21,6 +25,12 @@ export interface Backend {
   logout(): void;
   hasHostSession(): boolean;
   host<T = unknown>(action: HostAction, payload?: unknown): Promise<T>;
+}
+
+export interface CheckInResult {
+  playerId: string;
+  displayName: string;
+  already: boolean;
 }
 
 export class ApiError extends Error {

@@ -91,6 +91,39 @@ describe('service', () => {
     await expect(service.reopenRegistration({ tournamentId: 'nope', expectedEvents: 0 })).rejects.toThrow(/not found/);
   });
 
+  it('lets players check themselves in during registration only', async () => {
+    const { service, store } = setup();
+    const t = await service.createTournament({ date: '2026-11-05' });
+    const brian = await service.createPlayer({ name: 'Brian' });
+    // Returning player taps their name.
+    expect(await service.checkIn({ tournamentId: t.id, playerId: brian.id })).toMatchObject({ playerId: brian.id, already: false });
+    // Tapping again is harmless.
+    expect(await service.checkIn({ tournamentId: t.id, playerId: brian.id })).toMatchObject({ already: true });
+    // New player types their name.
+    const zev = await service.checkIn({ tournamentId: t.id, name: '  Zev ' });
+    expect(zev).toMatchObject({ displayName: 'Zev', already: false });
+    // Typing an existing name points them to the list instead of making a duplicate.
+    await expect(service.checkIn({ tournamentId: t.id, name: 'brian' })).rejects.toThrow(/already on the list/);
+    await expect(service.checkIn({ tournamentId: t.id, name: '   ' })).rejects.toThrow(/Enter a name/);
+    expect((await store.listEntrants(t.id)).map((e) => e.player_id).sort()).toEqual([brian.id, zev.playerId].sort());
+    // Closed once started.
+    for (const n of ['C', 'D']) await service.checkIn({ tournamentId: t.id, name: n });
+    await service.startTournament({ tournamentId: t.id });
+    await expect(service.checkIn({ tournamentId: t.id, name: 'Late Larry' })).rejects.toThrow(/closed/);
+    expect((await store.listPlayers()).some((p) => p.display_name === 'Late Larry')).toBe(false);
+  });
+
+  it('start renumbers duplicate seeds from simultaneous check-ins', async () => {
+    const { service, store } = setup();
+    const t = await service.createTournament({ date: '2026-11-05', settings: { randomSeeding: false } });
+    const ids: string[] = [];
+    for (const n of ['A', 'B', 'C', 'D']) ids.push((await service.checkIn({ tournamentId: t.id, name: n })).playerId);
+    await store.updateEntrant(t.id, ids[3], { seed: 3 }); // two entrants now share seed 3
+    await service.startTournament({ tournamentId: t.id });
+    const seeds = (await store.listEntrants(t.id)).map((e) => e.seed).sort();
+    expect(seeds).toEqual([1, 2, 3, 4]);
+  });
+
   it('rejects stale writes from a second device', async () => {
     const { service } = setup();
     const { t, ids } = await tournamentWith(service, ['A', 'B', 'C', 'D']);

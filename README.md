@@ -31,8 +31,8 @@ Everything runs in the cloud (Netlify + Supabase), so nothing has to stay runnin
 ## How a Thursday works
 
 1. Open the app on the iPad (home-screen icon) → **Host** → enter the PIN → **＋ New Thursday Tournament** (the date defaults to today).
-2. **Add players.** Start typing a name: returning players pop up, so tap them. New players: tap **＋ Add new player**. If a name looks like an existing player ("Jen Alvarez" vs "Jenn Alvarez"), the app asks before creating a duplicate.
-3. Check the settings (number of pool tables, random draw, bracket reset), then tap **🎱 Start Tournament**. The bracket is drawn. Tap **📺 TV Mode**: the TV shows the bracket and a QR code players scan to find their name.
+2. **Check-in.** Tap **📺 TV Mode**: the TV shows a big **"Scan to check in"** QR code and a live list of everyone checked in. Players scan it with their phone camera: returning players tap their name, new players type theirs (the app asks "Is one of these you?" if the name looks like an existing player). Names appear on the TV and the iPad within seconds. The host can still add or remove anyone from the iPad (start typing a name: returning players pop up; new players: **＋ Add new player**).
+3. Check the settings (number of pool tables, random draw, bracket reset), then tap **🎱 Start Tournament**. The bracket is drawn and the TV switches from check-in to the bracket by itself (its QR code now lets players find their name). Check-in closes once the tournament starts.
 4. On the **Matches** tab, each table shows two big buttons. **Tap the winner.** The bracket, the TV and everyone's phones update by themselves. Made a mistake? Tap **Undo** in the message that pops up (or the ↶ Undo button). To fix an older result, open the **Bracket** tab and tap that match.
 5. When the final is decided, the champion screen appears and the results are saved to history automatically.
 

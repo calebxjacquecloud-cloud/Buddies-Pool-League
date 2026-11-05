@@ -79,6 +79,17 @@ export class DemoBackend implements Backend {
   listSeasons() {
     return this.store.listSeasons();
   }
+  async listPlayers() {
+    return (await this.store.listPlayers()).map((p) => ({ id: p.id, display_name: p.display_name }));
+  }
+  async checkIn(input: { tournamentId: string; playerId?: string; name?: string }) {
+    try {
+      return await this.service.checkIn(input);
+    } catch (e) {
+      if (e instanceof AppError) throw new ApiError(e.message, e.status, e.code);
+      throw e;
+    }
+  }
   subscribe(_scope: string, onChange: () => void) {
     this.listeners.add(onChange);
     return () => void this.listeners.delete(onChange);
