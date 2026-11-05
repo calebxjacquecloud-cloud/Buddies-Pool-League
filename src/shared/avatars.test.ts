@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PRESETS, avatarProblem, defaultPreset, parseAvatar, presetPixels } from './avatars';
+import { FIRST_BALL, PRESETS, avatarProblem, defaultPreset, parseAvatar, presetPixels } from './avatars';
 
 describe('avatars', () => {
   it('every character draws on the same outlined grid, and they all look different', () => {
@@ -7,10 +7,15 @@ describe('avatars', () => {
     PRESETS.forEach((_, i) => {
       const g = presetPixels(i);
       expect(g).toHaveLength(18);
-      g.forEach((row) => expect(row).toHaveLength(16));
+      g.forEach((row) => expect(row).toHaveLength(g[0].length));
       seen.add(JSON.stringify(g));
     });
     expect(seen.size).toBe(PRESETS.length);
+  });
+
+  it('has the nine pool balls after the characters, and never defaults to one', () => {
+    expect(PRESETS.slice(FIRST_BALL).map((p) => p[1])).toEqual([1, 2, 3, 4, 5, 6, 7, 8, 9]);
+    for (let i = 0; i < 500; i++) expect(defaultPreset(`player-${i}`)).toBeLessThan(FIRST_BALL);
   });
 
   it('gives every player a stable default character', () => {

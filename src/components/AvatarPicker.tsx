@@ -1,7 +1,7 @@
 import { useRef, useState } from 'react';
 import { backend, type ApiError } from '../data';
 import { squareThumbnail } from '../lib/image';
-import { PRESETS, parseAvatar } from '../shared/avatars';
+import { PRESETS, parseAvatar, presetLabel } from '../shared/avatars';
 import { Avatar, PixelCharacter } from './Avatar';
 import { Modal } from './ui';
 
@@ -85,7 +85,7 @@ export function AvatarPicker({
                   }`}
                   disabled={busy}
                   onClick={() => save({ preset: i })}
-                  aria-label={`Character ${i + 1}`}
+                  aria-label={presetLabel(i)}
                 >
                   <PixelCharacter index={i} className="h-[80%] w-[80%]" />
                 </button>

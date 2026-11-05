@@ -74,7 +74,7 @@ export function Registration({ t, host, refresh }: { t: LiveTournament; host: Ho
   };
 
   return (
-    <div className="space-y-5 pb-28">
+    <div className="space-y-5 pb-52 md:pb-36">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <Link to="/host" className="text-sm text-muted">
@@ -197,8 +197,10 @@ export function Registration({ t, host, refresh }: { t: LiveTournament; host: Ho
         />
       </section>
 
-      <div className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-bg/95 backdrop-blur safe-x safe-b pt-3">
-        <div className="mx-auto max-w-7xl flex items-center justify-between gap-4">
+      {/* Centered so Netlify's bottom-right badge never covers the button; on
+          phones the badge spans the width, so the bar also sits above it. */}
+      <div className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-bg/95 backdrop-blur safe-x pt-3 pb-[max(5.5rem,env(safe-area-inset-bottom))] md:pb-5">
+        <div className="mx-auto max-w-7xl flex flex-col items-center gap-2 text-center">
           <span className="text-muted">
             {n < MIN_PLAYERS ? `Add ${MIN_PLAYERS - n} more to start` : `${n} players · bracket of ${nextPowerOfTwo(n)}`}
           </span>
