@@ -40,8 +40,7 @@ export function TournamentPage() {
             <ChampionCard state={state} name={name} />
           ) : (
             <section className="card p-4">
-              <h2 className="text-sm font-black uppercase tracking-widest text-muted mb-3">On the table &amp; up next</h2>
-              <QueueList state={state} name={name} />
+                            <QueueList state={state} name={name} />
             </section>
           )}
           <section className="card p-2 overflow-x-auto">

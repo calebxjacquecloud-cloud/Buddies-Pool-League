@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
-import { BYE, matchLabel, matchesUntilUp, roundLabel, type BracketState, type PlayerState, type Source } from '../engine';
+import { BYE, matchesUntilUp, roundLabel, type BracketState, type PlayerState, type Source } from '../engine';
 import { Bracket } from '../components/Bracket';
 import { StatTiles } from '../components/StatTiles';
 import { Avatar } from '../components/Avatar';
@@ -37,7 +37,7 @@ function waitingOn(state: BracketState, src: Source, name: (id: string | null | 
   if (src.kind === 'seed') return 'TBD';
   const m = state.matches[src.match];
   const who = m.players.filter((p) => p && p !== BYE).map((p) => name(p));
-  return `${src.kind === 'winner' ? 'winner' : 'loser'} of ${matchLabel(src.match)}${who.length === 2 ? ` (${who.join(' vs ')})` : ''}`;
+  return who.length === 2 ? `${src.kind === 'winner' ? 'winner' : 'loser'} of ${who.join(' vs ')}` : `${src.kind === 'winner' ? 'winner' : 'loser'} of an earlier match`;
 }
 
 export function PlayerPanel({ tournamentId, playerId }: { tournamentId: string; playerId: string }) {
@@ -110,7 +110,7 @@ export function PlayerPanel({ tournamentId, playerId }: { tournamentId: string; 
       {m && !state.complete && (
         <div className={`card p-5 ${until === 0 ? 'border-felt pulse-live' : until === 1 ? 'border-sky' : ''}`}>
           <div className="text-xs font-bold uppercase tracking-widest text-muted">
-            Your next match · {roundLabel(m.def, state.structure)} · {matchLabel(m.id)}
+            Your next match · {roundLabel(m.def, state.structure)}
           </div>
           <div className="text-2xl font-black mt-1">
             vs{' '}
@@ -122,7 +122,7 @@ export function PlayerPanel({ tournamentId, playerId }: { tournamentId: string; 
           </div>
           <div className="mt-2 text-lg font-bold">
             {until === 0 ? (
-              <span className="text-felt">🎱 You're on Table {m.table} now!</span>
+              <span className="text-felt">🎱 You're on the table now{state.settings.tables > 1 ? ` (table ${m.table})` : ''}!</span>
             ) : until === 1 ? (
               <span className="text-sky">You're up next. Head to the table!</span>
             ) : until !== null ? (

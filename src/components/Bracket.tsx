@@ -1,4 +1,4 @@
-import { BYE, matchLabel, roundLabel, type BracketState, type MatchState, type Source } from '../engine';
+import { BYE, roundLabel, type BracketState, type MatchState, type Source } from '../engine';
 
 export type BracketMode = 'host' | 'public' | 'tv';
 
@@ -80,9 +80,13 @@ function Section({ title, tone, mode, children }: { title: string; tone: 'felt' 
   );
 }
 
-function sourceLabel(src: Source): string {
+/** Who will fill an empty slot, by player names (no match codes): "Jacob / Jacque". */
+function sourceLabel(src: Source, state: BracketState, name: Props['name']): string {
   if (src.kind === 'seed') return 'TBD';
-  return `${src.kind === 'winner' ? 'Winner' : 'Loser'} of ${matchLabel(src.match)}`;
+  const from = state.matches[src.match];
+  const [a, b] = from.players;
+  if (!a || !b || a === BYE || b === BYE) return 'TBD';
+  return `${src.kind === 'loser' ? 'Loser: ' : ''}${name(a)} / ${name(b)}`;
 }
 
 function MatchBox({
@@ -123,7 +127,7 @@ function MatchBox({
   const row = (p: typeof a, i: 0 | 1) => {
     const won = m.status === 'done' && m.winner === p && p !== BYE;
     const lost = m.status === 'done' && m.loser === p;
-    const label = p === null ? sourceLabel(m.def.sources[i]) : name(p);
+    const label = p === null ? sourceLabel(m.def.sources[i], state, name) : name(p);
     const me = highlight && p === highlight;
     return (
       <div
@@ -151,16 +155,11 @@ function MatchBox({
         clickable ? 'active:scale-[0.98] transition' : ''
       }`}
     >
-      <div className={`flex items-center justify-between px-2.5 ${mode === 'tv' ? 'h-6 text-xs' : 'h-5 text-[10px]'} font-bold uppercase tracking-wider bg-surface-3/60 text-muted`}>
-        <span>{ifNeeded ? 'Reset · if needed' : matchLabel(m.id)}</span>
-        {onTable ? (
-          <span className="text-felt">Table {m.table}</span>
-        ) : nextUp ? (
-          <span className="text-sky">Up next</span>
-        ) : m.kind === 'walkover' ? (
-          <span>Forfeit</span>
-        ) : null}
-      </div>
+      {(ifNeeded || (nextUp && !onTable) || m.kind === 'walkover') && (
+        <div className={`flex items-center px-2.5 ${mode === 'tv' ? 'h-6 text-xs' : 'h-5 text-[10px]'} font-bold uppercase tracking-wider bg-surface-3/60`}>
+          {ifNeeded ? <span className="text-muted">Reset · if needed</span> : nextUp && !onTable ? <span className="text-sky">Up next</span> : <span className="text-muted">Forfeit</span>}
+        </div>
+      )}
       {row(a, 0)}
       {row(b, 1)}
     </Tag>

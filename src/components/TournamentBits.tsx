@@ -1,4 +1,4 @@
-import { matchLabel, roundLabel, type BracketState, type PlayerState } from '../engine';
+import { type BracketState, type PlayerState } from '../engine';
 import { ordinal } from '../shared/util';
 
 export function StatusChip({ ps }: { ps: PlayerState }) {
@@ -37,28 +37,37 @@ export function ChampionCard({ state, name, tv }: { state: BracketState; name: (
   );
 }
 
-/** Current and upcoming matches, for the TV ticker and public pages. */
-export function QueueList({ state, name, tv, limit = 6 }: { state: BracketState; name: (id: string | null | undefined) => string; tv?: boolean; limit?: number }) {
-  const items = [
-    ...state.onTable.map((id) => ({ id, kind: 'table' as const })),
-    ...state.upNext.slice(0, Math.max(0, limit - state.onTable.length)).map((id) => ({ id, kind: 'next' as const })),
-  ];
-  if (!items.length) return <p className="text-muted">Waiting on results…</p>;
+/** Current and upcoming matches for public pages: names only, like the TV. */
+export function QueueList({ state, name, limit = 6 }: { state: BracketState; name: (id: string | null | undefined) => string; limit?: number }) {
+  const next = state.upNext.slice(0, Math.max(0, limit - state.onTable.length));
+  if (!state.onTable.length && !next.length) return <p className="text-muted">Waiting on results…</p>;
+  const vs = (id: string) => (
+    <>
+      {name(state.matches[id].players[0])} <span className="text-faint font-semibold">vs</span> {name(state.matches[id].players[1])}
+    </>
+  );
   return (
-    <ul className={`space-y-2 ${tv ? 'text-2xl' : ''}`}>
-      {items.map(({ id, kind }, i) => {
-        const m = state.matches[id];
-        return (
-          <li key={id} className={`rounded-xl border px-4 py-3 ${kind === 'table' ? 'border-felt bg-felt/10' : 'border-line bg-surface-2'}`}>
-            <div className={`font-bold uppercase tracking-wider ${tv ? 'text-base' : 'text-xs'} ${kind === 'table' ? 'text-felt' : 'text-sky'}`}>
-              {kind === 'table' ? `Table ${m.table} · now` : i === state.onTable.length ? 'Up next' : `Then`} · {roundLabel(m.def, state.structure)} · {matchLabel(id)}
+    <div className="space-y-4">
+      {state.onTable.length > 0 && (
+        <div className="space-y-2">
+          <h3 className="text-sm font-black uppercase tracking-widest text-felt">On Table</h3>
+          {state.onTable.map((id) => (
+            <div key={id} className="rounded-xl border border-felt bg-felt/10 px-4 py-3 font-black text-lg leading-tight">
+              {vs(id)}
             </div>
-            <div className={`font-black ${tv ? 'break-words leading-tight' : 'truncate'}`}>
-              {name(m.players[0])} <span className="text-faint font-semibold">vs</span> {name(m.players[1])}
+          ))}
+        </div>
+      )}
+      {next.length > 0 && (
+        <div className="space-y-2">
+          <h3 className="text-sm font-black uppercase tracking-widest text-sky">Up Next</h3>
+          {next.map((id) => (
+            <div key={id} className="rounded-xl border border-sky/40 bg-sky/10 px-4 py-3 font-black text-lg leading-tight">
+              {vs(id)}
             </div>
-          </li>
-        );
-      })}
-    </ul>
+          ))}
+        </div>
+      )}
+    </div>
   );
 }

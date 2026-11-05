@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { BYE, matchLabel, roundLabel, type BracketState, type EngineEvent, type MatchState } from '../../engine';
+import { BYE, type BracketState, type EngineEvent, type MatchState } from '../../engine';
+import { Avatar } from '../../components/Avatar';
 import { Bracket } from '../../components/Bracket';
 import { ChampionCard, StatusChip } from '../../components/TournamentBits';
 import { Modal, Stepper, Toggle, useConfirm, useToast } from '../../components/ui';
@@ -8,7 +9,7 @@ import { enterFullscreen } from '../../components/fullscreen';
 import type { LiveTournament } from '../../hooks/data';
 import { useHostAction } from '../../hooks/host';
 import { useWakeLock } from '../../hooks/wakeLock';
-import type { TournamentSettings } from '../../shared/model';
+import type { PublicPlayer, TournamentSettings } from '../../shared/model';
 import { formatDate } from '../../shared/util';
 import type { useHostData } from './HostTournament';
 import { PlayerPicker } from './PlayerPicker';
@@ -17,8 +18,11 @@ import { TvHelpModal } from './TvHelpModal';
 type HostData = ReturnType<typeof useHostData>;
 type Tab = 'matches' | 'bracket' | 'players';
 
-export function describeEvent(e: EngineEvent, name: (id: string) => string) {
-  return e.type === 'result' ? `${name(e.winner)} won ${matchLabel(e.matchId)}` : `${name(e.player)} withdrew`;
+/** "Bob beat Iggy" / "Bob withdrew", using player names instead of match codes. */
+export function describeEvent(e: EngineEvent, name: (id: string) => string, state?: BracketState | null) {
+  if (e.type !== 'result') return `${name(e.player)} withdrew`;
+  const loser = state?.matches[e.matchId]?.players.find((p) => p && p !== e.winner && p !== BYE);
+  return loser ? `${name(e.winner)} beat ${name(loser)}` : `${name(e.winner)} won`;
 }
 
 export function RunView({ t, host, refresh }: { t: LiveTournament; host: HostData; refresh: () => Promise<void> }) {
@@ -46,7 +50,7 @@ export function RunView({ t, host, refresh }: { t: LiveTournament; host: HostDat
     toast({
       tone: 'ok',
       group: 'result',
-      text: `${name(winner)} wins ${matchLabel(matchId)}`,
+      text: describeEvent({ type: 'result', matchId, winner }, name, state),
       action: { label: 'Undo', run: () => void undo(expectedEvents + 1, { type: 'result', matchId, winner }) },
     });
   };
@@ -56,12 +60,12 @@ export function RunView({ t, host, refresh }: { t: LiveTournament; host: HostDat
     const last = known ?? events[expected - 1];
     if (!last) return;
     if (!known) {
-      const ok = await confirm({ title: 'Undo last result?', body: <p>{describeEvent(last, name)}</p>, confirm: 'Undo', tone: 'danger' });
+      const ok = await confirm({ title: 'Undo last result?', body: <p>{describeEvent(last, name, state)}</p>, confirm: 'Undo', tone: 'danger' });
       if (!ok) return;
     }
     if ((await run('undo', { tournamentId: tour.id, expectedEvents: expected }, { onStale })) !== undefined) {
       await refresh();
-      toast({ tone: 'info', group: 'result', text: `Undone: ${describeEvent(last, name)}` });
+      toast({ tone: 'info', group: 'result', text: `Undone: ${describeEvent(last, name, state)}` });
     }
   };
 
@@ -115,7 +119,7 @@ export function RunView({ t, host, refresh }: { t: LiveTournament; host: HostDat
         ))}
       </div>
 
-      {tab === 'matches' && <MatchesTab state={state} name={name} onRecord={record} busy={busy} onOpen={setMatchOpen} />}
+      {tab === 'matches' && <MatchesTab state={state} name={name} players={bundle.players} onRecord={record} busy={busy} onOpen={setMatchOpen} />}
       {tab === 'bracket' && (
         <div className="card p-3 overflow-auto">
           <Bracket state={state} name={name} mode="host" onMatch={setMatchOpen} />
@@ -145,96 +149,82 @@ export function RunView({ t, host, refresh }: { t: LiveTournament; host: HostDat
 function MatchesTab({
   state,
   name,
+  players,
   onRecord,
   busy,
   onOpen,
 }: {
   state: BracketState;
   name: (id: string | null | undefined) => string;
+  players: Record<string, PublicPlayer>;
   onRecord: (matchId: string, winner: string) => void;
   busy: boolean;
   onOpen: (id: string) => void;
 }) {
   if (state.complete) return <ChampionCard state={state} name={name} />;
-  const waiting = Object.values(state.matches).filter((m) => m.active && m.status === 'pending').length;
+  // Same information as the TV: who's on the table (tap the winner) and who's up next.
   return (
     <div className="space-y-6">
       <section>
-        <h2 className="text-sm font-black uppercase tracking-widest text-felt mb-2">On the table now</h2>
+        <h2 className="text-lg font-black uppercase tracking-widest text-felt mb-2">On Table</h2>
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
           {state.onTable.map((id) => (
-            <PlayCard key={id} m={state.matches[id]} state={state} name={name} onRecord={onRecord} busy={busy} big />
+            <PlayCard key={id} m={state.matches[id]} name={name} players={players} onRecord={onRecord} busy={busy} />
           ))}
+          {state.onTable.length === 0 && <p className="text-muted">Waiting on results</p>}
         </div>
       </section>
       {state.upNext.length > 0 && (
         <section>
-          <h2 className="text-sm font-black uppercase tracking-widest text-sky mb-2">Up next</h2>
+          <h2 className="text-lg font-black uppercase tracking-widest text-sky mb-2">Up Next</h2>
           <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
-            {state.upNext.map((id, i) => (
-              <button key={id} className="card p-4 text-left active:scale-[0.99] transition" onClick={() => onOpen(id)}>
-                <div className="text-xs font-bold uppercase tracking-wider text-muted">
-                  #{i + 1} · {roundLabel(state.matches[id].def, state.structure)} · {matchLabel(id)}
-                </div>
-                <div className="text-lg font-bold mt-1">
-                  {name(state.matches[id].players[0])} <span className="text-faint">vs</span> {name(state.matches[id].players[1])}
-                </div>
+            {state.upNext.map((id) => (
+              <button
+                key={id}
+                className="rounded-xl border border-sky/40 bg-sky/10 px-4 py-3 text-lg font-black text-center leading-tight active:scale-[0.99] transition"
+                onClick={() => onOpen(id)}
+              >
+                {name(state.matches[id].players[0])} <span className="text-faint">vs</span> {name(state.matches[id].players[1])}
               </button>
             ))}
           </div>
         </section>
       )}
-      {waiting > 0 && <p className="text-muted text-sm">{waiting} more match{waiting === 1 ? '' : 'es'} waiting on results.</p>}
     </div>
   );
 }
 
 function PlayCard({
   m,
-  state,
   name,
+  players,
   onRecord,
   busy,
-  big,
 }: {
   m: MatchState;
-  state: BracketState;
   name: (id: string | null | undefined) => string;
+  players: Record<string, PublicPlayer>;
   onRecord: (matchId: string, winner: string) => void;
   busy: boolean;
-  big?: boolean;
 }) {
   const [a, b] = m.players as string[];
-  const player = (p: string) => {
-    const ps = state.players[p];
-    return (
-      <button
-        className={`flex-1 min-w-0 rounded-2xl border-2 border-line bg-surface-2 active:bg-felt active:text-black active:border-felt transition px-2 sm:px-4 ${
-          big ? 'min-h-28 text-xl sm:text-2xl md:text-3xl' : 'min-h-20 text-lg sm:text-xl'
-        } font-black flex flex-col items-center justify-center gap-1 disabled:opacity-50`}
-        disabled={busy}
-        onClick={() => onRecord(m.id, p)}
-        aria-label={`${name(p)} wins`}
-      >
-        <span className="max-w-full text-center leading-tight [overflow-wrap:anywhere]">{name(p)}</span>
-        <span className="text-xs font-bold text-muted">{ps.losses === 0 ? 'Undefeated' : '1 loss'}</span>
-      </button>
-    );
-  };
+  const player = (p: string) => (
+    <button
+      className="w-full min-w-0 rounded-2xl border-2 border-line bg-surface-2 active:bg-felt active:text-black active:border-felt transition px-4 min-h-20 flex items-center gap-3 text-left disabled:opacity-50"
+      disabled={busy}
+      onClick={() => onRecord(m.id, p)}
+      aria-label={`${name(p)} wins`}
+    >
+      <Avatar player={{ id: p, avatar: players[p]?.avatar }} className="h-12 w-12" />
+      <span className="min-w-0 text-2xl md:text-3xl font-black leading-tight [overflow-wrap:anywhere]">{name(p)}</span>
+    </button>
+  );
   return (
-    <div className="card p-4 border-felt/60">
-      <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-        <span className="chip bg-felt text-black text-sm">Table {m.table}</span>
-        <span className="text-sm font-bold text-muted">
-          {roundLabel(m.def, state.structure)} · {matchLabel(m.id)}
-        </span>
-      </div>
-      <div className="flex items-stretch gap-2 sm:gap-3">
-        {player(a)}
-        <span className="self-center text-faint font-black">VS</span>
-        {player(b)}
-      </div>
-      <p className="text-center text-xs text-muted mt-2">Tap the winner</p>
+    <div className="rounded-2xl border-2 border-felt/60 bg-felt/10 p-4 space-y-2">
+      {player(a)}
+      <div className="text-center text-lg font-black text-faint">VS</div>
+      {player(b)}
+      <p className="text-center text-xs text-muted pt-1">Tap the winner</p>
     </div>
   );
 }
@@ -266,7 +256,7 @@ function MatchModal({
     const preview = await run<{ dropped: EngineEvent[]; expectedEvents: number }>('previewCorrection', { tournamentId: bundle.tournament.id, matchId: m.id, winner });
     if (!preview) return;
     const ok = await confirm({
-      title: `Change winner of ${matchLabel(m.id)} to ${name(winner)}?`,
+      title: `Change the winner to ${name(winner)}?`,
       tone: 'danger',
       confirm: 'Change result',
       body: preview.dropped.length ? (
@@ -274,7 +264,7 @@ function MatchModal({
           <p className="text-gold font-bold">This also erases {preview.dropped.length} later result{preview.dropped.length === 1 ? '' : 's'} that no longer make sense:</p>
           <ul className="list-disc pl-5">
             {preview.dropped.map((e, i) => (
-              <li key={i}>{describeEvent(e, (id) => name(id))}</li>
+              <li key={i}>{describeEvent(e, (id) => name(id), state)}</li>
             ))}
           </ul>
           <p>Those matches will need to be recorded again.</p>
@@ -288,12 +278,12 @@ function MatchModal({
     if (res !== undefined) {
       await refresh();
       onClose();
-      toast({ tone: 'ok', group: 'result', text: `${matchLabel(m.id)} corrected` });
+      toast({ tone: 'ok', group: 'result', text: `Corrected: ${name(winner)} beat ${name(m.players.find((p) => p !== winner))}` });
     }
   };
 
   return (
-    <Modal open onClose={onClose} title={`${roundLabel(m.def, state.structure)} · ${matchLabel(m.id)}`}>
+    <Modal open onClose={onClose} title={`${name(a)} vs ${name(b)}`}>
       {m.status === 'ready' && (
         <div className="space-y-3">
           <p className="text-muted">Who won?</p>
