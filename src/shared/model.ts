@@ -5,10 +5,15 @@ import type { EngineEvent } from '../engine';
 export interface Player {
   id: string;
   display_name: string;
+  /** "px:<n>" character, photo URL, or null for the default character (see shared/avatars). */
+  avatar?: string | null;
   /** Normalized name used to prevent duplicates. */
   name_key: string;
   created_at: string;
 }
+
+/** What anyone can see about a player. */
+export type PublicPlayer = Pick<Player, 'id' | 'display_name' | 'avatar'>;
 
 export interface TournamentSettings {
   tables: number;
@@ -76,13 +81,13 @@ export interface Season {
 export interface TournamentBundle {
   tournament: Tournament;
   entrants: Entrant[];
-  players: Record<string, Pick<Player, 'id' | 'display_name'>>;
+  players: Record<string, PublicPlayer>;
   events: EngineEvent[];
 }
 
 /** Everything needed to compute leaderboards and player histories. */
 export interface StatsData {
-  players: Pick<Player, 'id' | 'display_name'>[];
+  players: PublicPlayer[];
   tournaments: Tournament[];
   entrants: Entrant[];
   matches: MatchRow[];

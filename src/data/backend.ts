@@ -1,5 +1,5 @@
 import type { HostAction } from '../shared/service';
-import type { Season, StatsData, Tournament, TournamentBundle } from '../shared/model';
+import type { PublicPlayer, Season, StatsData, Tournament, TournamentBundle } from '../shared/model';
 
 export type ConnectionStatus = 'online' | 'reconnecting' | 'offline';
 
@@ -13,9 +13,11 @@ export interface Backend {
   getStatsData(): Promise<StatsData>;
   listSeasons(): Promise<Season[]>;
   /** Everyone on the roster (names only), for the check-in search. */
-  listPlayers(): Promise<{ id: string; display_name: string }[]>;
+  listPlayers(): Promise<PublicPlayer[]>;
   /** Public self check-in while the tournament is in registration. */
   checkIn(input: { tournamentId: string; playerId?: string; name?: string }): Promise<CheckInResult>;
+  /** Public: pick a character (preset index) or upload a photo (JPEG data URL, already resized). */
+  setAvatar(input: { playerId: string; preset?: number; image?: string }): Promise<{ avatar: string | null }>;
   /** Calls onChange whenever data for this tournament (or anything, with '*') changes. */
   subscribe(scope: string, onChange: () => void): () => void;
   onStatus(cb: (s: ConnectionStatus) => void): () => void;

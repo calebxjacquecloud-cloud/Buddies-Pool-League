@@ -1,5 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
+import { Avatar } from '../components/Avatar';
+import { AvatarPicker } from '../components/AvatarPicker';
 import { Badge, Empty, Spinner } from '../components/ui';
 import { backend, type ApiError, type CheckInResult } from '../data';
 import { useLive, useTournament } from '../hooks/data';
@@ -34,11 +36,13 @@ export function CheckIn() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState<CheckInResult | null>(null);
+  const [picking, setPicking] = useState(false);
   // Who this phone checked in earlier (kept in state so "check someone else in" re-renders).
   const [saved, setSaved] = useState(() => (id ? remembered(id) : null));
 
   const players = useMemo(() => [...(roster.data ?? [])].sort((a, b) => a.display_name.localeCompare(b.display_name)), [roster.data]);
-  const results = useMemo(() => (query.trim() ? searchPlayers(query, players).slice(0, 12) : []), [query, players]);
+  // Everyone who has checked in before; typing narrows the list.
+  const results = useMemo(() => searchPlayers(query, players), [query, players]);
   const similar = useMemo(() => similarNames(newName, players).slice(0, 4), [newName, players]);
 
   if (t === undefined) return <Spinner />;
@@ -66,9 +70,14 @@ export function CheckIn() {
   if (myName && mine) {
     return (
       <div className="max-w-md mx-auto space-y-5 text-center py-6">
-        <div className="text-7xl">✅</div>
+        <div className="flex justify-center">
+          <Avatar player={{ id: mine, avatar: players.find((p) => p.id === mine)?.avatar }} className="h-28 w-28" />
+        </div>
         <h1 className="text-3xl font-black">You're in, {myName}!</h1>
         <p className="text-muted">Look for your name on the TV. The bracket goes up when the host starts the tournament.</p>
+        <button className="btn-secondary btn-lg w-full" onClick={() => setPicking(true)}>
+          Choose your picture
+        </button>
         <Link to={`/t/${tour.id}/p/${mine}`} className="btn-primary btn-lg w-full">
           See my page
         </Link>
@@ -88,6 +97,12 @@ export function CheckIn() {
         >
           Not {myName}? Check someone else in
         </button>
+        <AvatarPicker
+          open={picking}
+          onClose={() => setPicking(false)}
+          player={{ id: mine, display_name: myName, avatar: players.find((p) => p.id === mine)?.avatar }}
+          onSaved={() => void roster.refresh()}
+        />
       </div>
     );
   }
@@ -124,50 +139,51 @@ export function CheckIn() {
 
       {mode === 'search' ? (
         <section className="space-y-3">
-          <label className="block">
-            <span className="label">Played here before? Find your name</span>
-            <input
-              className="field text-lg"
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Start typing your name"
-              autoCapitalize="words"
-              autoCorrect="off"
-              spellCheck={false}
-            />
-          </label>
-          {query.trim() && (
-            <ul className="rounded-xl border border-line divide-y divide-line">
-              {results.map((p) => {
-                const isIn = entered.has(p.id);
-                return (
-                  <li key={p.id}>
-                    <button
-                      className="w-full flex items-center justify-between gap-3 px-4 min-h-14 text-left disabled:opacity-60"
-                      disabled={busy}
-                      onClick={() => (isIn ? (remember(tour.id, p.id), setDone({ playerId: p.id, displayName: p.display_name, already: true })) : submit({ playerId: p.id }))}
-                    >
-                      <span className="text-lg font-bold">{p.display_name}</span>
-                      {isIn ? <span className="chip bg-felt/20 text-felt">✓ Checked in</span> : <span className="chip bg-felt text-black">That's me</span>}
-                    </button>
-                  </li>
-                );
-              })}
-              {results.length === 0 && <li className="p-4 text-muted">No match. Add yourself as a new player below.</li>}
-            </ul>
-          )}
-          <div className="pt-2 border-t border-line">
-            <button
-              className="btn-secondary w-full btn-lg"
-              onClick={() => {
-                setMode('new');
-                setNewName(query.trim());
-                setError(null);
-              }}
-            >
-              I'm new: add my name
-            </button>
-          </div>
+          <input
+            className="field text-lg"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search for your name"
+            aria-label="Search for your name"
+            autoCapitalize="words"
+            autoCorrect="off"
+            spellCheck={false}
+          />
+          <button
+            className="btn-primary w-full btn-lg"
+            onClick={() => {
+              setMode('new');
+              setNewName(query.trim());
+              setError(null);
+            }}
+          >
+            New Player? +
+          </button>
+          <ul className="rounded-xl border border-line divide-y divide-line">
+            {results.map((p) => {
+              const isIn = entered.has(p.id);
+              return (
+                <li key={p.id}>
+                  <button
+                    className="w-full flex items-center gap-3 px-3 min-h-14 text-left disabled:opacity-60"
+                    disabled={busy}
+                    onClick={() => {
+                      if (!isIn) return void submit({ playerId: p.id });
+                      remember(tour.id, p.id);
+                      setSaved(p.id);
+                    }}
+                  >
+                    <Avatar player={p} className="h-9 w-9" ring={false} />
+                    <span className="flex-1 min-w-0 truncate text-lg font-bold">{p.display_name}</span>
+                    {isIn ? <span className="chip bg-felt/20 text-felt shrink-0">✓ In</span> : <span className="chip bg-surface-3 text-ink shrink-0">That's me</span>}
+                  </button>
+                </li>
+              );
+            })}
+            {results.length === 0 && (
+              <li className="p-4 text-muted">{players.length ? 'No match. Tap "New Player? +" to add your name.' : 'No players yet. Tap "New Player? +" to add your name.'}</li>
+            )}
+          </ul>
         </section>
       ) : (
         <form

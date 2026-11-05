@@ -1,7 +1,7 @@
 import { createClient, type RealtimeChannel, type SupabaseClient } from '@supabase/supabase-js';
 import type { EngineEvent } from '../engine';
 import type { HostAction } from '../shared/service';
-import type { Entrant, MatchRow, Season, StatsData, Tournament, TournamentBundle } from '../shared/model';
+import type { Entrant, MatchRow, PublicPlayer, Season, StatsData, Tournament, TournamentBundle } from '../shared/model';
 import { ApiError, session, StatusHub, type Backend, type CheckInResult } from './backend';
 
 /** Production backend: reads straight from Supabase, writes through Netlify Functions. */
@@ -46,10 +46,15 @@ export class SupabaseBackend implements Backend {
     ]);
     const ids = entrants.map((e) => e.player_id);
     const players = ids.length
-      ? await this.q<{ id: string; display_name: string }[]>(this.db.from('players').select('id, display_name').in('id', ids))
+      ? await this.q<PublicPlayer[]>(this.db.from('players').select('*').in('id', ids))
       : [];
     this.markOnline();
-    return { tournament: t, entrants, events: events.map((e) => e.event), players: Object.fromEntries(players.map((p) => [p.id, p])) };
+    return {
+      tournament: t,
+      entrants,
+      events: events.map((e) => e.event),
+      players: Object.fromEntries(players.map((p) => [p.id, { id: p.id, display_name: p.display_name, avatar: p.avatar ?? null }])),
+    };
   }
 
   async listTournaments() {
@@ -69,8 +74,25 @@ export class SupabaseBackend implements Backend {
     return { players, tournaments, entrants, matches };
   }
 
-  async listPlayers() {
-    return this.all<{ id: string; display_name: string }>('players', 'id, display_name');
+  async listPlayers(): Promise<PublicPlayer[]> {
+    const rows = await this.all<PublicPlayer>('players', '*');
+    return rows.map((p) => ({ id: p.id, display_name: p.display_name, avatar: p.avatar ?? null }));
+  }
+
+  async setAvatar(input: { playerId: string; preset?: number; image?: string }) {
+    let res: Response;
+    try {
+      res = await fetch('/.netlify/functions/avatar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(input),
+      });
+    } catch {
+      throw new ApiError('No connection. Check the Wi-Fi and try again.', 0, 'NETWORK');
+    }
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) throw new ApiError(body.error ?? `Error ${res.status}`, res.status, body.code);
+    return body as { avatar: string | null };
   }
 
   async checkIn(input: { tournamentId: string; playerId?: string; name?: string }): Promise<CheckInResult> {

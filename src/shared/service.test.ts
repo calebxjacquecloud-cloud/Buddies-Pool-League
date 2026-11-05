@@ -124,6 +124,21 @@ describe('service', () => {
     expect(seeds).toEqual([1, 2, 3, 4]);
   });
 
+  it('saves player pictures, sticky across tournaments, and lets the host reset them', async () => {
+    const { service, store } = setup();
+    const p = await service.createPlayer({ name: 'Iggy' });
+    await service.setAvatar({ playerId: p.id, avatar: 'px:5' });
+    expect((await store.getPlayer(p.id))!.avatar).toBe('px:5');
+    // Shows up in any tournament bundle afterwards.
+    const t = await service.createTournament({ date: '2026-11-12' });
+    await service.checkIn({ tournamentId: t.id, playerId: p.id });
+    const { loadBundle } = await import('./service');
+    expect((await loadBundle(store, t.id))!.players[p.id].avatar).toBe('px:5');
+    await expect(service.setAvatar({ playerId: p.id, avatar: 'javascript:alert(1)' })).rejects.toThrow(/valid/);
+    await service.resetAvatar({ playerId: p.id });
+    expect((await store.getPlayer(p.id))!.avatar).toBeNull();
+  });
+
   it('rejects stale writes from a second device', async () => {
     const { service } = setup();
     const { t, ids } = await tournamentWith(service, ['A', 'B', 'C', 'D']);

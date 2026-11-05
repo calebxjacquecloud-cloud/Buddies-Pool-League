@@ -78,6 +78,14 @@ describe('migration', () => {
     expect(await as('anon', `select seq, event->>'matchId' as m from tournament_events`)).toEqual([{ seq: 0, m: 'W1-1' }]);
   });
 
+  it('stores player pictures safely', async () => {
+    expect(await as('service_role', `update players set avatar = 'px:4' where id = '${A}'`)).toEqual([]);
+    expect(await as('service_role', `update players set avatar = 'https://x.supabase.co/a.jpg' where id = '${A}'`)).toEqual([]);
+    expect(await as('service_role', `update players set avatar = 'javascript:alert(1)' where id = '${A}'`)).toMatch(/check constraint/);
+    expect(await as('anon', `update players set avatar = 'px:1' where id = '${A}'`)).toMatch(/^ERR/);
+    expect(await as('anon', `select avatar from players where id = '${A}'`)).toEqual([{ avatar: 'https://x.supabase.co/a.jpg' }]);
+  });
+
   it('replaces matches', async () => {
     const rows = JSON.stringify([{ match_id: 'W1-1', bracket: 'W', round: 1, winner_id: A, loser_id: B, kind: 'normal', seq: 1 }]);
     await as('service_role', `select replace_matches('${T}','${rows}')`);

@@ -1,9 +1,11 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { BYE, matchLabel, matchesUntilUp, roundLabel, type BracketState, type PlayerState, type Source } from '../engine';
 import { Bracket } from '../components/Bracket';
 import { StatTiles } from '../components/StatTiles';
-import { Badge, Empty, Spinner } from '../components/ui';
+import { Avatar } from '../components/Avatar';
+import { AvatarPicker } from '../components/AvatarPicker';
+import { Empty, Spinner } from '../components/ui';
 import { useTournament } from '../hooks/data';
 import { useStats } from '../hooks/stats';
 import { ordinal } from '../shared/util';
@@ -39,8 +41,9 @@ function waitingOn(state: BracketState, src: Source, name: (id: string | null | 
 }
 
 export function PlayerPanel({ tournamentId, playerId }: { tournamentId: string; playerId: string }) {
-  const { t } = useTournament(tournamentId);
+  const { t, refresh } = useTournament(tournamentId);
   const allTime = useStats();
+  const [picking, setPicking] = useState(false);
   const scroller = useRef<HTMLDivElement>(null);
   const me = useMemo(() => allTime.rows?.find((r) => r.playerId === playerId), [allTime.rows, playerId]);
 
@@ -57,11 +60,28 @@ export function PlayerPanel({ tournamentId, playerId }: { tournamentId: string; 
   const playerName = name(playerId);
   const inTournament = bundle.entrants.some((e) => e.player_id === playerId);
   if (!inTournament) return <Empty title="Player not found in this tournament" />;
+  const me_ = bundle.players[playerId];
+  const header = (
+    <div className="flex items-center gap-4">
+      <button className="relative shrink-0" onClick={() => setPicking(true)} aria-label="Change your picture">
+        <Avatar player={{ id: playerId, avatar: me_?.avatar }} className="h-16 w-16" />
+        <span className="absolute -bottom-1 -right-1 chip bg-surface-3 border border-line text-[10px]">Edit</span>
+      </button>
+      <div className="min-w-0">
+        <div className="text-xs font-bold uppercase tracking-widest text-muted">{bundle.tournament.name}</div>
+        <h1 className="text-3xl md:text-4xl font-black truncate">{playerName}</h1>
+        <button className="text-sm font-bold text-sky" onClick={() => setPicking(true)}>
+          Change picture
+        </button>
+      </div>
+      <AvatarPicker open={picking} onClose={() => setPicking(false)} player={{ id: playerId, display_name: playerName, avatar: me_?.avatar }} onSaved={() => void refresh()} />
+    </div>
+  );
 
   if (!state) {
     return (
       <div className="space-y-4 max-w-2xl mx-auto">
-        <h1 className="text-4xl font-black">{playerName}</h1>
+        {header}
         <div className="card p-6">
           <p className="text-xl font-bold">You're signed up! 🎱</p>
           <p className="text-muted mt-1">The bracket appears here when the host starts the tournament at 7:00pm. Keep this page open; it updates by itself.</p>
@@ -80,13 +100,7 @@ export function PlayerPanel({ tournamentId, playerId }: { tournamentId: string; 
 
   return (
     <div className="space-y-5 max-w-3xl mx-auto">
-      <div className="flex items-center gap-4">
-        <Badge className="h-14 w-14" />
-        <div className="min-w-0">
-          <div className="text-xs font-bold uppercase tracking-widest text-muted">{bundle.tournament.name}</div>
-          <h1 className="text-3xl md:text-4xl font-black truncate">{playerName}</h1>
-        </div>
-      </div>
+      {header}
 
       <div className={`rounded-2xl p-5 ${copy.tone}`}>
         <div className="text-3xl font-black">{copy.title}</div>

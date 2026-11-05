@@ -80,7 +80,17 @@ export class DemoBackend implements Backend {
     return this.store.listSeasons();
   }
   async listPlayers() {
-    return (await this.store.listPlayers()).map((p) => ({ id: p.id, display_name: p.display_name }));
+    return (await this.store.listPlayers()).map((p) => ({ id: p.id, display_name: p.display_name, avatar: p.avatar ?? null }));
+  }
+  async setAvatar(input: { playerId: string; preset?: number; image?: string }) {
+    try {
+      const avatar = input.image ?? (input.preset !== undefined ? `px:${input.preset}` : null);
+      const res = await this.service.setAvatar({ playerId: input.playerId, avatar });
+      return { avatar: res.avatar };
+    } catch (e) {
+      if (e instanceof AppError) throw new ApiError(e.message, e.status, e.code);
+      throw e;
+    }
   }
   async checkIn(input: { tournamentId: string; playerId?: string; name?: string }) {
     try {

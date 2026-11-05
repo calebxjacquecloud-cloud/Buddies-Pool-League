@@ -7,6 +7,9 @@ import { MemoryStore } from '../../src/shared/memoryStore';
 
 const store = new MemoryStore();
 const checkins = { count: 0 };
+const uploads: string[] = [];
+const removed: string[] = [];
+let storageOk = true;
 vi.mock('../lib/supabaseStore', () => ({
   SupabaseStore: {
     fromEnv: () =>
@@ -19,6 +22,13 @@ vi.mock('../lib/supabaseStore', () => ({
             }),
             insert: async () => ({}),
           }),
+          storage: {
+            from: () => ({
+              upload: async (path: string) => (uploads.push(path), storageOk ? { data: { path }, error: null } : { data: null, error: { message: 'Bucket not found' } }),
+              getPublicUrl: (path: string) => ({ data: { publicUrl: `https://proj.supabase.co/storage/v1/object/public/avatars/${path}` } }),
+              remove: async (paths: string[]) => (removed.push(...paths), { error: null }),
+            }),
+          },
         },
       }),
   },
@@ -27,6 +37,7 @@ vi.mock('../lib/supabaseStore', () => ({
 const { default: api } = await import('../functions/api');
 const { default: login } = await import('../functions/host-login');
 const { default: checkin } = await import('../functions/checkin');
+const { default: avatarFn } = await import('../functions/avatar');
 
 const ctx = {} as never;
 const post = (url: string, body: unknown, headers: Record<string, string> = {}) =>
@@ -110,5 +121,42 @@ describe('checkin (public)', () => {
     const closed = await send({ tournamentId: t.id, name: 'Too Late' });
     expect(closed.status).toBe(409);
     expect(((await closed.json()) as { error: string }).error).toMatch(/closed/);
+  });
+});
+
+describe('avatar (public)', () => {
+  // Smallest valid JPEG header + filler.
+  const jpeg = `data:image/jpeg;base64,${Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 16, 74, 70, 73, 70]).toString('base64')}`;
+
+  it('sets characters and uploads photos, replacing the old photo', async () => {
+    const { Service } = await import('../../src/shared/service');
+    const service = new Service(store);
+    const p = await service.createPlayer({ name: 'Pic Person' });
+    const send = (body: unknown) => avatarFn(post('https://x/.netlify/functions/avatar', body), ctx);
+
+    let res = await send({ playerId: p.id, preset: 7 });
+    expect(await res.json()).toEqual({ avatar: 'px:7' });
+    expect((await send({ playerId: p.id, preset: 999 })).status).toBe(400);
+
+    res = await send({ playerId: p.id, image: jpeg });
+    const first = ((await res.json()) as { avatar: string }).avatar;
+    expect(first).toMatch(/^https:\/\/proj\.supabase\.co\/storage\/v1\/object\/public\/avatars\//);
+    expect((await store.getPlayer(p.id))!.avatar).toBe(first);
+
+    await new Promise((r) => setTimeout(r, 5));
+    res = await send({ playerId: p.id, image: jpeg });
+    expect(removed).toContain(first.split('/avatars/')[1]);
+
+    // Not an image, too big, unknown player.
+    expect((await send({ playerId: p.id, image: 'data:image/png;base64,' + Buffer.from('hello').toString('base64') })).status).toBe(400);
+    expect((await send({ playerId: p.id, image: 'data:image/jpeg;base64,' + Buffer.alloc(300_000, 0xff).toString('base64') })).status).toBe(400);
+    expect((await send({ playerId: 'nope', preset: 1 })).status).toBe(404);
+
+    // Storage not set up yet: clear message, picture unchanged.
+    storageOk = false;
+    res = await send({ playerId: p.id, image: jpeg });
+    expect(res.status).toBe(503);
+    expect(((await res.json()) as { error: string }).error).toMatch(/Pick a character/);
+    storageOk = true;
   });
 });

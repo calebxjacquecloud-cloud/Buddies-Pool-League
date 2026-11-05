@@ -38,6 +38,8 @@ Everything runs in the cloud (Netlify + Supabase), so nothing has to stay runnin
 
 **Players tab:** see everyone's status, add a late player, or **Withdraw** someone who left.
 
+**Player pictures:** after checking in (or from their own page), players tap **Choose your picture** to pick a pixel character or upload a photo. Photos are cropped and shrunk on the phone (about 10–20 KB) and stored in Supabase Storage; characters are drawn by the app and take no storage. Everyone has a default character until they choose. Pictures stick to the player's name every week and can be changed any time. It's honor-system (no login), so the host can remove any picture under **Host → Players → Reset picture**.
+
 ---
 
 ## Setup guide

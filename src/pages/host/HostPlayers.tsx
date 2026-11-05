@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Spinner } from '../../components/ui';
+import { Avatar } from '../../components/Avatar';
+import { Spinner, useConfirm } from '../../components/ui';
+import { useHostAction } from '../../hooks/host';
 import { backend } from '../../data';
 import type { Player } from '../../shared/model';
 import { searchPlayers } from '../../shared/names';
@@ -11,6 +13,8 @@ export function HostPlayers() {
   const [players, setPlayers] = useState<Player[] | null>(null);
   const [query, setQuery] = useState('');
   const [editing, setEditing] = useState<Player | null>(null);
+  const { run, busy } = useHostAction();
+  const confirm = useConfirm();
   const load = async () => setPlayers(await backend.host<Player[]>('hostPlayers').catch(() => players ?? []));
   useEffect(() => {
     void load();
@@ -33,12 +37,24 @@ export function HostPlayers() {
       ) : (
         <ul className="card divide-y divide-line">
           {list.map((p) => (
-            <li key={p.id} className="flex items-center justify-between gap-3 p-4">
-              <div>
-                <Link to={`/players/${p.id}`} className="text-lg font-bold">
-                  {p.display_name}
-                </Link>
-              </div>
+            <li key={p.id} className="flex items-center gap-3 p-4">
+              <Avatar player={p} className="h-11 w-11" />
+              <Link to={`/players/${p.id}`} className="flex-1 min-w-0 truncate text-lg font-bold">
+                {p.display_name}
+              </Link>
+              {p.avatar && (
+                <button
+                  className="btn-ghost btn-sm text-danger"
+                  disabled={busy}
+                  onClick={async () => {
+                    if (await confirm({ title: `Reset ${p.display_name}'s picture?`, body: 'They go back to their default character and can pick again.', confirm: 'Reset picture', tone: 'danger' })) {
+                      if ((await run('resetAvatar', { playerId: p.id })) !== undefined) void load();
+                    }
+                  }}
+                >
+                  Reset picture
+                </button>
+              )}
               <button className="btn-secondary btn-sm" onClick={() => setEditing(p)}>
                 Edit
               </button>

@@ -20,6 +20,7 @@ import {
   type TournamentBundle,
   type TournamentSettings,
 } from './model';
+import { avatarProblem } from './avatars';
 import { cleanName, nameKey } from './names';
 import type { Store } from './store';
 import { AppError, defaultTournamentName, shuffle, todayAtBar, uuid } from './util';
@@ -181,6 +182,29 @@ export class Service {
     }
     await this.addEntrant({ tournamentId: t.id, playerId: player.id });
     return { playerId: player.id, displayName: player.display_name, already: false };
+  }
+
+  /**
+   * Sets a player's picture: "px:<n>" for a character, a photo URL (or a data
+   * URL in demo mode), or null for the default character. Public and
+   * changeable any time; the host can reset it from the player list.
+   */
+  async setAvatar(input: { playerId: string; avatar: string | null }) {
+    const player = await this.store.getPlayer(input.playerId);
+    if (!player) throw new AppError('Player not found', 404);
+    const problem = avatarProblem(input.avatar);
+    if (problem) throw new AppError(problem);
+    await this.store.updatePlayer(player.id, { avatar: input.avatar });
+    // Refresh any screen showing a tournament this player is in tonight.
+    const entries = (await this.store.listEntrants()).filter((e) => e.player_id === player.id);
+    const tournaments = await Promise.all(entries.map((e) => this.store.getTournament(e.tournament_id)));
+    await Promise.all(tournaments.filter((t) => t && t.status !== 'complete').map((t) => this.touch(t!.id)));
+    return { avatar: input.avatar, previous: player.avatar ?? null };
+  }
+
+  /** Host: remove a picture (back to the default character). */
+  async resetAvatar(input: { playerId: string }) {
+    return this.setAvatar({ playerId: input.playerId, avatar: null });
   }
 
   async removeEntrant(input: { tournamentId: string; playerId: string }) {
@@ -406,7 +430,7 @@ export async function loadBundle(store: Store, tournamentId: string): Promise<To
     tournament: t,
     entrants,
     events,
-    players: Object.fromEntries(players.filter((p) => ids.has(p.id)).map((p) => [p.id, { id: p.id, display_name: p.display_name }])),
+    players: Object.fromEntries(players.filter((p) => ids.has(p.id)).map((p) => [p.id, { id: p.id, display_name: p.display_name, avatar: p.avatar ?? null }])),
   };
 }
 
@@ -430,6 +454,7 @@ export const HOST_ACTIONS = [
   'correctResult',
   'saveSeason',
   'deleteSeason',
+  'resetAvatar',
 ] as const;
 export type HostAction = (typeof HOST_ACTIONS)[number];
 

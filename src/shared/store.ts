@@ -9,7 +9,7 @@ export interface Store {
   listPlayers(): Promise<Player[]>;
   getPlayer(id: string): Promise<Player | null>;
   insertPlayer(p: Player): Promise<void>;
-  updatePlayer(id: string, patch: Partial<Pick<Player, 'display_name' | 'name_key'>>): Promise<void>;
+  updatePlayer(id: string, patch: Partial<Pick<Player, 'display_name' | 'name_key' | 'avatar'>>): Promise<void>;
 
   listTournaments(): Promise<Tournament[]>;
   getTournament(id: string): Promise<Tournament | null>;

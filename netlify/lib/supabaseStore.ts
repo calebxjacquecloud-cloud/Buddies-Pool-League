@@ -31,7 +31,9 @@ export class SupabaseStore implements Store {
     return this.check(await this.db.from('players').select('*').eq('id', id).maybeSingle()) as Player | null;
   }
   async insertPlayer(p: Player) {
-    const res = await this.db.from('players').insert(p);
+    // Leave avatar out when empty, so adding players works even before the avatar column exists.
+    const { avatar, ...rest } = p;
+    const res = await this.db.from('players').insert(avatar ? p : rest);
     if (res.error?.code === '23505') throw new AppError('That player already exists', 409, 'DUPLICATE');
     this.check(res);
   }
