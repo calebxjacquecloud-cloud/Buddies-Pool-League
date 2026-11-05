@@ -90,9 +90,13 @@ export function CheckIn() {
             } catch {
               // ignore
             }
+            // Start the next person fresh: back to the name search, nothing pre-filled.
             setSaved(null);
             setDone(null);
             setQuery('');
+            setNewName('');
+            setMode('search');
+            setError(null);
           }}
         >
           Not {myName}? Check someone else in
