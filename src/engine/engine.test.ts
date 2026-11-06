@@ -475,6 +475,43 @@ describe('tables and queue', () => {
     expect(matchesUntilUp(s, s.matches[s.upNext[0]].players[0] as string)).toBe(1);
   });
 
+  it('plays waiting matches before a winner\'s next match (9 players, 1 table)', () => {
+    // Real night: only W1-2 is a real first-round match; W2-2..W2-4 (players
+    // with byes) are already waiting. The W1-2 winner must not jump the line.
+    const input = { seeds: players(9), events: [] as EngineEvent[], settings };
+    let s = computeBracket(input);
+    expect(s.onTable).toEqual(['W1-2']);
+    expect(s.upNext).toEqual(['W2-2', 'W2-3', 'W2-4']);
+    input.events.push({ type: 'result', matchId: 'W1-2', winner: 'p8' });
+    s = computeBracket(input);
+    expect(s.onTable).toEqual(['W2-2']);
+    expect(s.upNext).toEqual(['W2-3', 'W2-4', 'W2-1']);
+    const order = ['W2-2'];
+    while (order.length < 4) {
+      input.events.push({ type: 'result', matchId: s.onTable[0], winner: s.matches[s.onTable[0]].players[0] as string });
+      s = computeBracket(input);
+      order.push(s.onTable[0]);
+    }
+    expect(order).toEqual(['W2-2', 'W2-3', 'W2-4', 'W2-1']);
+  });
+
+  it('never puts a player straight back on when another match is waiting', () => {
+    for (const n of [5, 7, 9, 13, 17]) {
+      const input = { seeds: players(n), events: [] as EngineEvent[], settings };
+      let s = computeBracket(input);
+      while (!s.complete) {
+        const id = s.onTable[0];
+        const [a, b] = s.matches[id].players as string[];
+        const waiting = s.upNext.length;
+        input.events.push({ type: 'result', matchId: id, winner: a });
+        s = computeBracket(input);
+        if (s.complete || !waiting) continue;
+        const next = s.matches[s.onTable[0]].players;
+        expect(next.includes(a) || next.includes(b), `${n} players: ${a}/${b} replayed immediately`).toBe(false);
+      }
+    }
+  });
+
   it('tracks each player status and next match', () => {
     const input = { seeds: players(4), events: [{ type: 'result', matchId: 'W1-1', winner: 'p1' }] as EngineEvent[], settings };
     const s = computeBracket(input);

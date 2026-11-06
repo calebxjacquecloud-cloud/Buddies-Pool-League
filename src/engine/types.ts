@@ -82,6 +82,11 @@ export interface MatchState {
   eventIndex: number | null;
   /** Table number while the match is being played. */
   table: number | null;
+  /**
+   * When the match got both players (number of events applied so far; -1 =
+   * ready at the start). The table goes to the match that has waited longest.
+   */
+  readyAt: number | null;
   /** False for GF2 when no bracket reset is needed (or reset is disabled). */
   active: boolean;
 }

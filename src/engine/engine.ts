@@ -29,6 +29,8 @@ class Replay {
   readonly structure: BracketStructure;
   readonly matches: Record<string, MatchState> = {};
   readonly withdrawn = new Set<PlayerId>();
+  /** Events applied so far; stamps when each match becomes ready. */
+  step = -1;
   /** table number -> match id (undefined = free). */
   readonly tables: (string | undefined)[];
 
@@ -37,7 +39,7 @@ class Replay {
     for (const def of this.structure.matches) {
       this.matches[def.id] = {
         def, id: def.id, players: [null, null], status: 'pending', kind: null,
-        winner: null, loser: null, eventIndex: null, table: null, active: def.id !== 'GF2',
+        winner: null, loser: null, eventIndex: null, table: null, readyAt: null, active: def.id !== 'GF2',
       };
     }
     this.tables = new Array(Math.max(1, Math.floor(input.settings.tables || 1))).fill(undefined);
@@ -95,6 +97,7 @@ class Replay {
           continue;
         }
         m.status = 'ready';
+        if (m.readyAt === null) m.readyAt = this.step;
       }
     }
     this.updateGrandFinal();
@@ -130,15 +133,26 @@ class Replay {
       this.tables[t] = undefined;
     }
     const assigned = new Set(this.tables.filter(Boolean));
-    for (const def of this.structure.matches) {
+    for (const m of this.queue()) {
       const free = this.tables.indexOf(undefined);
       if (free === -1) break;
-      const m = this.matches[def.id];
-      if (m.status !== 'ready' || !m.active || assigned.has(m.id)) continue;
+      if (assigned.has(m.id)) continue;
       this.tables[free] = m.id;
       m.table = free + 1;
       assigned.add(m.id);
     }
+  }
+
+  /**
+   * Ready matches in the order they should be played: whoever has waited
+   * longest goes first, so "Up next" really is next and a player who just
+   * won rests while earlier matches are played. Ties keep bracket order.
+   */
+  queue(): MatchState[] {
+    return this.structure.matches
+      .map((d) => this.matches[d.id])
+      .filter((m) => m.active && m.status === 'ready')
+      .sort((a, b) => a.readyAt! - b.readyAt! || a.def.order - b.def.order);
   }
 
   champion(): PlayerId | null {
@@ -160,11 +174,13 @@ class Replay {
       if (event.winner !== m.players[0] && event.winner !== m.players[1]) {
         return `That player is not in ${event.matchId}`;
       }
+      this.step++;
       this.decide(m, event.winner, 'normal', index);
     } else if (event.type === 'withdraw') {
       if (!this.input.seeds.includes(event.player)) return 'Unknown player';
       if (this.withdrawn.has(event.player)) return 'Player already withdrawn';
       if (this.lossesOf(event.player) >= 2) return 'Player is already eliminated';
+      this.step++;
       this.withdrawn.add(event.player);
     } else {
       return 'Unknown event';
@@ -245,12 +261,7 @@ export function computeBracket(input: EngineInput): BracketState {
   if (champion) assignPlacements(r, players, champion);
 
   const onTable = r.tables.filter((t): t is string => t !== undefined);
-  const upNext = r.structure.matches
-    .filter((d) => {
-      const m = matches[d.id];
-      return m.active && m.status === 'ready' && m.table === null;
-    })
-    .map((d) => d.id);
+  const upNext = r.queue().filter((m) => m.table === null).map((m) => m.id);
 
   return {
     structure: r.structure, matches, players, onTable, upNext, champion,
