@@ -139,6 +139,21 @@ describe('service', () => {
     expect((await store.getPlayer(p.id))!.avatar).toBeNull();
   });
 
+  it('host play-order picks are saved, undoable, and do not count as matches', async () => {
+    const { service, store } = setup();
+    const { t } = await tournamentWith(service, ['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I']);
+    await service.startTournament({ tournamentId: t.id });
+    let state = await service.sync(t.id);
+    const pick = state.upNext[state.upNext.length - 1];
+    await service.queueMatch({ tournamentId: t.id, matchId: pick, now: true, expectedEvents: 0 });
+    state = await service.sync(t.id);
+    expect(state.onTable).toEqual([pick]);
+    expect(await store.listMatches(t.id)).toEqual([]);
+    await service.undo({ tournamentId: t.id, expectedEvents: 1 });
+    state = await service.sync(t.id);
+    expect(state.onTable).not.toEqual([pick]);
+  });
+
   it('rejects stale writes from a second device', async () => {
     const { service } = setup();
     const { t, ids } = await tournamentWith(service, ['A', 'B', 'C', 'D']);

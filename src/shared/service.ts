@@ -308,6 +308,11 @@ export class Service {
     await this.append(input.tournamentId, input.expectedEvents, { type: 'result', matchId: input.matchId, winner: input.winner });
   }
 
+  /** Host picks the play order: put a waiting match on the table now, or make it play next. */
+  async queueMatch(input: { tournamentId: string; matchId: string; now: boolean; expectedEvents: number }) {
+    await this.append(input.tournamentId, input.expectedEvents, { type: 'queue', matchId: input.matchId, now: !!input.now });
+  }
+
   async withdraw(input: { tournamentId: string; playerId: string; expectedEvents: number }) {
     await this.append(input.tournamentId, input.expectedEvents, { type: 'withdraw', player: input.playerId });
   }
@@ -448,6 +453,7 @@ export const HOST_ACTIONS = [
   'startTournament',
   'reopenRegistration',
   'recordResult',
+  'queueMatch',
   'withdraw',
   'undo',
   'previewCorrection',

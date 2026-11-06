@@ -512,6 +512,81 @@ describe('tables and queue', () => {
     }
   });
 
+  it('host can make a waiting match play next', () => {
+    const input = { seeds: players(9), events: [] as EngineEvent[], settings };
+    input.events.push({ type: 'result', matchId: 'W1-2', winner: 'p8' });
+    let s = computeBracket(input);
+    expect(s.upNext).toEqual(['W2-3', 'W2-4', 'W2-1']);
+    input.events.push({ type: 'queue', matchId: 'W2-1', now: false });
+    s = computeBracket(input);
+    expect(s.onTable).toEqual(['W2-2']); // current match keeps the table
+    expect(s.upNext).toEqual(['W2-1', 'W2-3', 'W2-4']);
+    // After the table frees up, the chosen match goes on.
+    input.events.push({ type: 'result', matchId: 'W2-2', winner: s.matches['W2-2'].players[0] as string });
+    s = computeBracket(input);
+    expect(s.onTable).toEqual(['W2-1']);
+  });
+
+  it('host can put a match on the table now; the replaced match goes to the front', () => {
+    const input = { seeds: players(9), events: [] as EngineEvent[], settings };
+    input.events.push({ type: 'queue', matchId: 'W2-4', now: true });
+    let s = computeBracket(input);
+    expect(s.onTable).toEqual(['W2-4']);
+    expect(s.upNext[0]).toBe('W1-2');
+    expect(s.matches['W2-4'].table).toBe(1);
+    // With two tables and one free, "now" just uses the free table.
+    const two = { seeds: players(9), events: [] as EngineEvent[], settings: { ...settings, tables: 2 } };
+    s = computeBracket(two);
+    expect(s.onTable).toEqual(['W1-2', 'W2-2']);
+    two.events.push({ type: 'queue', matchId: 'W2-4', now: true });
+    s = computeBracket(two);
+    // Replaces the most recently assigned table (W2-2), which goes back to the front.
+    expect(s.onTable).toEqual(['W1-2', 'W2-4']);
+    expect(s.upNext[0]).toBe('W2-2');
+  });
+
+  it('rejects play-order picks for matches that are not waiting', () => {
+    const input = { seeds: players(9), events: [] as EngineEvent[], settings };
+    expect(validateEvent(input, { type: 'queue', matchId: 'W1-2', now: true })).toMatch(/already on a table/);
+    expect(validateEvent(input, { type: 'queue', matchId: 'W3-1', now: false })).toMatch(/isn't ready/);
+    expect(validateEvent(input, { type: 'queue', matchId: 'W1-1', now: false })).toMatch(/isn't ready/); // bye
+  });
+
+  it('play-order picks never change results, and a correction drops picks that no longer apply', () => {
+    const input = { seeds: players(9), events: [] as EngineEvent[], settings };
+    input.events.push({ type: 'result', matchId: 'W1-2', winner: 'p8' });
+    input.events.push({ type: 'queue', matchId: 'W2-1', now: true });
+    const s = computeBracket(input);
+    expect(s.matches['W2-1'].players).toEqual(['p1', 'p8']);
+    const fixed = correctResult(input, 'W1-2', 'p9');
+    // W2-1 is still ready (now p1 vs p9), so the pick still applies.
+    expect(fixed.dropped).toEqual([]);
+    expect(computeBracket({ ...input, events: fixed.events }).onTable).toEqual(['W2-1']);
+  });
+
+  it('full random tournaments with random host picks always finish cleanly', () => {
+    for (const n of [6, 9, 13, 17]) {
+      const rand = rng(n * 31);
+      const input = { seeds: players(n), events: [] as EngineEvent[], settings: { ...settings, tables: n > 10 ? 2 : 1 } };
+      let s = computeBracket(input);
+      let guard = 0;
+      while (!s.complete) {
+        if (++guard > 300) throw new Error('stuck');
+        if (s.upNext.length && rand() < 0.3) {
+          input.events.push({ type: 'queue', matchId: s.upNext[Math.floor(rand() * s.upNext.length)], now: rand() < 0.5 });
+        } else {
+          const id = s.onTable[0];
+          input.events.push({ type: 'result', matchId: id, winner: pickRandom(rand)(s, id) });
+        }
+        s = computeBracket(input);
+        expect(s.invalidEvents).toEqual([]);
+        expect(new Set(s.onTable).size).toBe(s.onTable.length);
+      }
+      const played = Object.values(s.matches).filter((m) => m.active && m.kind === 'normal').length;
+      expect([2 * n - 2, 2 * n - 1]).toContain(played);
+    }
+  });
+
   it('tracks each player status and next match', () => {
     const input = { seeds: players(4), events: [{ type: 'result', matchId: 'W1-1', winner: 'p1' }] as EngineEvent[], settings };
     const s = computeBracket(input);

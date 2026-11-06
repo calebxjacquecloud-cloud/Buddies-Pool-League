@@ -31,6 +31,9 @@ class Replay {
   readonly withdrawn = new Set<PlayerId>();
   /** Events applied so far; stamps when each match becomes ready. */
   step = -1;
+  /** Counters for host play-order choices and table assignments. */
+  private boostSeq = 0;
+  private assignSeq = 0;
   /** table number -> match id (undefined = free). */
   readonly tables: (string | undefined)[];
 
@@ -39,7 +42,7 @@ class Replay {
     for (const def of this.structure.matches) {
       this.matches[def.id] = {
         def, id: def.id, players: [null, null], status: 'pending', kind: null,
-        winner: null, loser: null, eventIndex: null, table: null, readyAt: null, active: def.id !== 'GF2',
+        winner: null, loser: null, eventIndex: null, table: null, readyAt: null, boost: 0, assignedAt: 0, active: def.id !== 'GF2',
       };
     }
     this.tables = new Array(Math.max(1, Math.floor(input.settings.tables || 1))).fill(undefined);
@@ -139,6 +142,7 @@ class Replay {
       if (assigned.has(m.id)) continue;
       this.tables[free] = m.id;
       m.table = free + 1;
+      m.assignedAt = ++this.assignSeq;
       assigned.add(m.id);
     }
   }
@@ -152,7 +156,7 @@ class Replay {
     return this.structure.matches
       .map((d) => this.matches[d.id])
       .filter((m) => m.active && m.status === 'ready')
-      .sort((a, b) => a.readyAt! - b.readyAt! || a.def.order - b.def.order);
+      .sort((a, b) => b.boost - a.boost || a.readyAt! - b.readyAt! || a.def.order - b.def.order);
   }
 
   champion(): PlayerId | null {
@@ -176,6 +180,30 @@ class Replay {
       }
       this.step++;
       this.decide(m, event.winner, 'normal', index);
+    } else if (event.type === 'queue') {
+      const m = this.matches[event.matchId];
+      if (!m || !m.active) return `Unknown match ${event.matchId}`;
+      if (m.status !== 'ready') return "That match isn't ready to play yet";
+      if (m.table !== null) return 'That match is already on a table';
+      this.step++;
+      if (event.now) {
+        let free = this.tables.indexOf(undefined);
+        if (free === -1) {
+          // Replace the match that went on most recently; it goes back to the front of the line.
+          free = 0;
+          this.tables.forEach((id, i) => {
+            if (this.matches[id!].assignedAt > this.matches[this.tables[free]!].assignedAt) free = i;
+          });
+          const bumped = this.matches[this.tables[free]!];
+          bumped.table = null;
+          bumped.boost = ++this.boostSeq;
+        }
+        this.tables[free] = m.id;
+        m.table = free + 1;
+        m.assignedAt = ++this.assignSeq;
+      } else {
+        m.boost = ++this.boostSeq;
+      }
     } else if (event.type === 'withdraw') {
       if (!this.input.seeds.includes(event.player)) return 'Unknown player';
       if (this.withdrawn.has(event.player)) return 'Player already withdrawn';

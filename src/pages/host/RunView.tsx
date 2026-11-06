@@ -20,7 +20,12 @@ type Tab = 'matches' | 'bracket' | 'players';
 
 /** "Bob beat Iggy" / "Bob withdrew", using player names instead of match codes. */
 export function describeEvent(e: EngineEvent, name: (id: string) => string, state?: BracketState | null) {
-  if (e.type !== 'result') return `${name(e.player)} withdrew`;
+  if (e.type === 'withdraw') return `${name(e.player)} withdrew`;
+  if (e.type === 'queue') {
+    const [a, b] = state?.matches[e.matchId]?.players ?? [];
+    const who = a && b ? `${name(a)} vs ${name(b)}` : 'A match';
+    return e.now ? `${who} put on the table` : `${who} moved up next`;
+  }
   const loser = state?.matches[e.matchId]?.players.find((p) => p && p !== e.winner && p !== BYE);
   return loser ? `${name(e.winner)} beat ${name(loser)}` : `${name(e.winner)} won`;
 }
@@ -52,6 +57,19 @@ export function RunView({ t, host, refresh }: { t: LiveTournament; host: HostDat
       group: 'result',
       text: describeEvent({ type: 'result', matchId, winner }, name, state),
       action: { label: 'Undo', run: () => void undo(expectedEvents + 1, { type: 'result', matchId, winner }) },
+    });
+  };
+
+  /** Host picks the play order for a waiting match. */
+  const queue = async (matchId: string, now: boolean) => {
+    const res = await run('queueMatch', { tournamentId: tour.id, matchId, now, expectedEvents }, { onStale });
+    if (res === undefined) return;
+    await refresh();
+    toast({
+      tone: 'ok',
+      group: 'result',
+      text: describeEvent({ type: 'queue', matchId, now }, name, state),
+      action: { label: 'Undo', run: () => void undo(expectedEvents + 1, { type: 'queue', matchId, now }) },
     });
   };
 
@@ -136,6 +154,10 @@ export function RunView({ t, host, refresh }: { t: LiveTournament; host: HostDat
           setMatchOpen(null);
           await record(m, w);
         }}
+        onQueue={async (m, now) => {
+          setMatchOpen(null);
+          await queue(m, now);
+        }}
         refresh={refresh}
       />
       <TvHelpModal open={tvOpen} onClose={() => setTvOpen(false)} onStart={goTv} />
@@ -176,7 +198,8 @@ function MatchesTab({
       </section>
       {state.upNext.length > 0 && (
         <section>
-          <h2 className="text-lg font-black uppercase tracking-widest text-sky mb-2">Up Next</h2>
+          <h2 className="text-lg font-black uppercase tracking-widest text-sky mb-1">Up Next</h2>
+          <p className="text-xs text-muted mb-2">Tap a match to play it next or put it on the table now.</p>
           <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-3">
             {state.upNext.map((id) => (
               <button
@@ -236,12 +259,14 @@ function MatchModal({
   t,
   onClose,
   onRecord,
+  onQueue,
   refresh,
 }: {
   matchId: string | null;
   t: LiveTournament;
   onClose: () => void;
   onRecord: (matchId: string, winner: string) => void;
+  onQueue: (matchId: string, now: boolean) => void;
   refresh: () => Promise<void>;
 }) {
   const { state, name, bundle } = t;
@@ -255,15 +280,17 @@ function MatchModal({
   const correct = async (winner: string) => {
     const preview = await run<{ dropped: EngineEvent[]; expectedEvents: number }>('previewCorrection', { tournamentId: bundle.tournament.id, matchId: m.id, winner });
     if (!preview) return;
+    // Only results matter here; dropped play-order picks aren't worth listing.
+    const lost = preview.dropped.filter((e) => e.type !== 'queue');
     const ok = await confirm({
       title: `Change the winner to ${name(winner)}?`,
       tone: 'danger',
       confirm: 'Change result',
-      body: preview.dropped.length ? (
+      body: lost.length ? (
         <>
-          <p className="text-gold font-bold">This also erases {preview.dropped.length} later result{preview.dropped.length === 1 ? '' : 's'} that no longer make sense:</p>
+          <p className="text-gold font-bold">This also erases {lost.length} later result{lost.length === 1 ? '' : 's'} that no longer make sense:</p>
           <ul className="list-disc pl-5">
-            {preview.dropped.map((e, i) => (
+            {lost.map((e, i) => (
               <li key={i}>{describeEvent(e, (id) => name(id), state)}</li>
             ))}
           </ul>
@@ -284,9 +311,25 @@ function MatchModal({
 
   return (
     <Modal open onClose={onClose} title={`${name(a)} vs ${name(b)}`}>
+      {m.status === 'ready' && m.table === null && (
+        <div className="space-y-2 mb-5">
+          <p className="text-muted">Play order</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <button className="btn-primary" disabled={busy || state.upNext[0] === m.id} onClick={() => onQueue(m.id, false)}>
+              {state.upNext[0] === m.id ? 'Already next' : 'Play this next'}
+            </button>
+            <button className="btn-secondary" disabled={busy} onClick={() => onQueue(m.id, true)}>
+              Put on the table now
+            </button>
+          </div>
+          <p className="text-xs text-muted">
+            {state.onTable.length ? 'Putting it on the table now sends the current match back to the front of the line.' : ''}
+          </p>
+        </div>
+      )}
       {m.status === 'ready' && (
         <div className="space-y-3">
-          <p className="text-muted">Who won?</p>
+          <p className="text-muted">{m.table === null ? 'Or, if it was already played: who won?' : 'Who won?'}</p>
           {[a, b].map((p) => (
             <button key={p} className="btn-secondary btn-lg w-full" onClick={() => onRecord(m.id, p)} disabled={busy}>
               {name(p)}

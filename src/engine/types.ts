@@ -43,7 +43,12 @@ export interface BracketStructure {
 /** Events are the only source of truth for tournament progress. */
 export type EngineEvent =
   | { type: 'result'; matchId: string; winner: PlayerId }
-  | { type: 'withdraw'; player: PlayerId };
+  | { type: 'withdraw'; player: PlayerId }
+  /**
+   * Host picks the play order: `now` puts the match on a table (the match it
+   * replaces goes back to the front of the line); otherwise it plays next.
+   */
+  | { type: 'queue'; matchId: string; now: boolean };
 
 export interface EngineSettings {
   /** Play a second grand final if the losers-bracket champion wins the first. */
@@ -87,6 +92,10 @@ export interface MatchState {
    * ready at the start). The table goes to the match that has waited longest.
    */
   readyAt: number | null;
+  /** Host's "play next" priority (higher plays sooner); 0 = normal order. */
+  boost: number;
+  /** Order in which matches were put on tables (to pick which one a "now" replaces). */
+  assignedAt: number;
   /** False for GF2 when no bracket reset is needed (or reset is disabled). */
   active: boolean;
 }
