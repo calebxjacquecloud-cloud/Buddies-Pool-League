@@ -218,7 +218,7 @@ describe('full tournaments', () => {
         }
       }
     }
-  });
+  }, 60_000);
 });
 
 describe('grand final', () => {

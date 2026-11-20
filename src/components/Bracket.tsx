@@ -61,7 +61,7 @@ export function Bracket({ state, name, mode, onMatch, highlight }: Props) {
         </div>
       </Section>
       {lRounds.length > 0 && (
-        <Section title="Losers Bracket" tone="ember" mode={mode}>
+        <Section title="Redemption Bracket" tone="ember" mode={mode}>
           <div className="flex gap-4 items-start">{lRounds.map((defs, i) => column(defs, lHeight, `l${i}`))}</div>
         </Section>
       )}

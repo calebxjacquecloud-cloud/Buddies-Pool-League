@@ -191,7 +191,7 @@ export function Registration({ t, host, refresh }: { t: LiveTournament; host: Ho
         />
         <Toggle
           label="Grand final bracket reset"
-          hint="If the losers-bracket champ wins the final, play one more"
+          hint="If the Redemption Bracket champ wins the final, play one more"
           checked={tour.settings.grandFinalReset}
           onChange={(v) => setSettings({ grandFinalReset: v })}
         />

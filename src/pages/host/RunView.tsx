@@ -465,7 +465,7 @@ function SettingsModal({ open, onClose, t, refresh }: { open: boolean; onClose: 
         </div>
         <Toggle
           label="Grand final bracket reset"
-          hint={gf1Done ? 'Locked: the grand final has been played' : 'Second final if the losers-bracket champ wins'}
+          hint={gf1Done ? 'Locked: the grand final has been played' : 'Second final if the Redemption Bracket champ wins'}
           checked={tour.settings.grandFinalReset}
           onChange={(v) => !gf1Done && set({ grandFinalReset: v })}
         />

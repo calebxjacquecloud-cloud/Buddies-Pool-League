@@ -135,9 +135,9 @@ export function roundLabel(def: Pick<MatchDef, 'bracket' | 'round'>, structure: 
     return `Winners Round ${def.round}`;
   }
   const fromEnd = structure.losersRounds - def.round;
-  if (fromEnd === 0) return 'Losers Final';
-  if (fromEnd === 1) return 'Losers Semis';
-  return `Losers Round ${def.round}`;
+  if (fromEnd === 0) return 'Redemption Final';
+  if (fromEnd === 1) return 'Redemption Semis';
+  return `Redemption Round ${def.round}`;
 }
 
 export function matchLabel(id: string): string {

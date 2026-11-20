@@ -23,7 +23,7 @@ function statusCopy(ps: PlayerState) {
     case 'winners':
       return { title: 'Still alive', sub: 'Undefeated: winners bracket', tone: 'bg-felt text-black' };
     case 'losers':
-      return { title: 'Still alive', sub: 'Losers bracket: one more loss and you’re out', tone: 'bg-ember text-black' };
+      return { title: 'Still alive', sub: 'Redemption Bracket: one more loss and you’re out', tone: 'bg-ember text-black' };
     default:
       return {
         title: ps.place ? `Finished ${ordinal(ps.place)}` : 'Eliminated',

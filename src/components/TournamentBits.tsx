@@ -5,7 +5,7 @@ export function StatusChip({ ps }: { ps: PlayerState }) {
   if (ps.status === 'champion') return <span className="chip bg-gold text-black">🏆 Champion</span>;
   if (ps.withdrawn && ps.status !== 'eliminated') return <span className="chip bg-surface-3 text-muted">Withdrawn</span>;
   if (ps.status === 'winners') return <span className="chip bg-felt text-black">Winners bracket</span>;
-  if (ps.status === 'losers') return <span className="chip bg-ember text-black">Losers bracket · 1 loss</span>;
+  if (ps.status === 'losers') return <span className="chip bg-ember text-black">Redemption Bracket · 1 loss</span>;
   return <span className="chip bg-surface-3 text-muted">{ps.place ? `${ordinal(ps.place)} place` : 'Eliminated'}{ps.withdrawn ? ' · withdrew' : ''}</span>;
 }
 

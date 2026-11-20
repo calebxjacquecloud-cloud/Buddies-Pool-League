@@ -122,16 +122,16 @@ TV mode shows a **QR code**; players scan it with their phone camera, tap their 
 
 ## Bracket rules the app follows
 
-- **Double elimination.** First loss drops you to the losers bracket; second loss eliminates you.
+- **Double elimination.** First loss drops you to the Redemption Bracket (the losers bracket); second loss eliminates you.
 - **4 to 64 players.** The bracket is padded to the next power of 2 (8, 16, 32, 64) with **byes**. Byes go to the top seeds, advance automatically, and never count as wins or losses.
 - **Seeding:** random draw by default. Turn off *Random draw* to set the order yourself (▲▼ arrows, seed 1 at the top) or tap **Shuffle**.
-- **Losers-bracket crossover:** players dropping from the winners bracket are placed in the opposite section of the losers bracket (standard reverse / swap-halves pattern), so they don't immediately replay someone from their own section. In the last few rounds rematches can't always be avoided; that's normal for double elimination.
-- **Grand final:** winners-bracket champion vs losers-bracket champion. If the losers-bracket champion wins, a **bracket reset** match decides it (setting, on by default).
+- **Redemption Bracket crossover:** players dropping from the winners bracket are placed in the opposite section of the Redemption Bracket (standard reverse / swap-halves pattern), so they don't immediately replay someone from their own section. In the last few rounds rematches can't always be avoided; that's normal for double elimination.
+- **Grand final:** winners-bracket champion vs Redemption Bracket champion. If the Redemption Bracket champion wins, a **bracket reset** match decides it (setting, on by default).
 - **Play order / tables:** matches are queued in standard order. With more than one table, each table gets the next ready match when it frees up.
 - **Undo** removes the last result. **Correcting an older result** recalculates everything after it; results that no longer make sense (because different players would have met) are listed and erased after you confirm.
 - **Withdrawals:** the player's remaining matches become **forfeits** (walkovers). Forfeits don't count as wins or losses for anyone. A withdrawn player's matches already played still count.
 - **Late entry:** before any result, anyone can be added (the bracket is redrawn when you start). After results exist, a late player can take an **open bye slot**, but only if the player who had that bye hasn't played their next match yet and the bracket doesn't need to grow. Otherwise the app explains why it's blocked.
-- **Placements:** 1st and 2nd from the final; then by the losers-bracket round where you were eliminated, with shared places (3rd, 4th, 5th–6th, 7th–8th, 9th–12th…).
+- **Placements:** 1st and 2nd from the final; then by the Redemption Bracket round where you were eliminated, with shared places (3rd, 4th, 5th–6th, 7th–8th, 9th–12th…).
 - **Stats** count only finished tournaments and only matches actually played (every match stores its winner **and** loser).
 
 ---
